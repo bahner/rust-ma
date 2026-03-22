@@ -10,8 +10,6 @@ use crate::{
 };
 
 pub const DEFAULT_DID_CONTEXT: &[&str] = &["https://w3id.org/did/v1"];
-pub const DEFAULT_HOST_TYPE: &str = "p2p";
-pub const DEFAULT_TOPIC_TYPE: &str = "p2p/gossipsub";
 pub const DEFAULT_PROOF_TYPE: &str = "MultiformatSignature2023";
 pub const DEFAULT_PROOF_PURPOSE: &str = "assertionMethod";
 
@@ -114,62 +112,6 @@ impl Proof {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Host {
-    pub id: String,
-    #[serde(rename = "type")]
-    pub host_type: String,
-}
-
-impl Host {
-    pub fn new(id: impl Into<String>, host_type: impl Into<String>) -> Result<Self> {
-        let host = Self {
-            id: id.into(),
-            host_type: host_type.into(),
-        };
-        host.validate()?;
-        Ok(host)
-    }
-
-    pub fn validate(&self) -> Result<()> {
-        if self.id.is_empty() {
-            return Err(MaError::MissingHostId);
-        }
-        if self.host_type.is_empty() {
-            return Err(MaError::MissingHostType);
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Topic {
-    pub id: String,
-    #[serde(rename = "type")]
-    pub topic_type: String,
-}
-
-impl Topic {
-    pub fn new(id: impl Into<String>, topic_type: impl Into<String>) -> Result<Self> {
-        let topic = Self {
-            id: id.into(),
-            topic_type: topic_type.into(),
-        };
-        topic.validate()?;
-        Ok(topic)
-    }
-
-    pub fn validate(&self) -> Result<()> {
-        if self.id.is_empty() {
-            return Err(MaError::MissingTopicId);
-        }
-        if self.topic_type.is_empty() {
-            return Err(MaError::MissingTopicType);
-        }
-        Ok(())
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Document {
     #[serde(rename = "@context")]
@@ -189,10 +131,6 @@ pub struct Document {
     pub ma_presence_hint: Option<String>,
     #[serde(rename = "ma:locale", skip_serializing_if = "Option::is_none")]
     pub ma_locale: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub host: Option<Host>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub topic: Option<Topic>,
 }
 
 impl Document {
@@ -208,8 +146,6 @@ impl Document {
             identity: None,
             ma_presence_hint: None,
             ma_locale: None,
-            host: None,
-            topic: None,
         }
     }
 
@@ -277,12 +213,6 @@ impl Document {
         Ok(())
     }
 
-    pub fn set_host(&mut self, host: Host) -> Result<()> {
-        host.validate()?;
-        self.host = Some(host);
-        Ok(())
-    }
-
     pub fn set_presence_hint(&mut self, hint: impl Into<String>) -> Result<()> {
         let hint = hint.into().trim().to_string();
         if hint.is_empty() {
@@ -307,12 +237,6 @@ impl Document {
 
     pub fn clear_locale(&mut self) {
         self.ma_locale = None;
-    }
-
-    pub fn set_topic(&mut self, topic: Topic) -> Result<()> {
-        topic.validate()?;
-        self.topic = Some(topic);
-        Ok(())
     }
 
     pub fn assertion_method_public_key(&self) -> Result<VerifyingKey> {
@@ -420,14 +344,6 @@ impl Document {
             if locale.trim().is_empty() {
                 return Err(MaError::EmptyLocale);
             }
-        }
-
-        if let Some(host) = &self.host {
-            host.validate()?;
-        }
-
-        if let Some(topic) = &self.topic {
-            topic.validate()?;
         }
 
         for method in &self.verification_method {

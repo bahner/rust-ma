@@ -68,14 +68,6 @@ pub enum MaError {
     InvalidDocumentSignature,
     #[error("message signature is invalid")]
     InvalidMessageSignature,
-    #[error("host id missing")]
-    MissingHostId,
-    #[error("host type missing")]
-    MissingHostType,
-    #[error("topic id missing")]
-    MissingTopicId,
-    #[error("topic type missing")]
-    MissingTopicType,
     #[error("presence hint is empty")]
     EmptyPresenceHint,
     #[error("locale is empty")]
