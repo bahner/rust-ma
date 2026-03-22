@@ -18,7 +18,18 @@ use crate::{
 };
 
 pub const MESSAGE_PREFIX: &str = "/ma/";
+
+/// Generic / fallback ma message
 pub const DEFAULT_CONTENT_TYPE: &str = "application/x.ma";
+/// Human chat text (replaces the Chatter envelope variant)
+pub const CONTENT_TYPE_CHAT: &str = "application/x.ma.chat";
+/// Presence events: arrival, departure, room change
+pub const CONTENT_TYPE_PRESENCE: &str = "application/x.ma.presence";
+/// Room and actor commands (replaces RoomCommand / ActorCommand)
+pub const CONTENT_TYPE_COMMAND: &str = "application/x.ma.command";
+/// DID document update published by an avatar or agent
+pub const CONTENT_TYPE_DOC: &str = "application/x.ma.doc";
+
 pub const DEFAULT_REPLAY_WINDOW_SECS: u64 = 120;
 pub const DEFAULT_MAX_CLOCK_SKEW_SECS: u64 = 30;
 

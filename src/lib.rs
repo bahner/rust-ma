@@ -17,6 +17,8 @@ pub use key::{
     SigningKey, X25519_PUB_CODEC,
 };
 pub use msg::{
-    Envelope, Headers, Message, ReplayGuard, DEFAULT_CONTENT_TYPE,
+    Envelope, Headers, Message, ReplayGuard,
+    DEFAULT_CONTENT_TYPE, CONTENT_TYPE_CHAT, CONTENT_TYPE_PRESENCE,
+    CONTENT_TYPE_COMMAND, CONTENT_TYPE_DOC,
     DEFAULT_MAX_CLOCK_SKEW_SECS, DEFAULT_REPLAY_WINDOW_SECS, MESSAGE_PREFIX,
 };

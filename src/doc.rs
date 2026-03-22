@@ -185,8 +185,8 @@ pub struct Document {
     pub proof: Proof,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identity: Option<String>,
-    #[serde(rename = "ma:location", skip_serializing_if = "Option::is_none")]
-    pub ma_location: Option<String>,
+    #[serde(rename = "ma:presenceHint", skip_serializing_if = "Option::is_none")]
+    pub ma_presence_hint: Option<String>,
     #[serde(rename = "ma:locale", skip_serializing_if = "Option::is_none")]
     pub ma_locale: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -206,7 +206,7 @@ impl Document {
             key_agreement: String::new(),
             proof: Proof::default(),
             identity: None,
-            ma_location: None,
+            ma_presence_hint: None,
             ma_locale: None,
             host: None,
             topic: None,
@@ -283,17 +283,17 @@ impl Document {
         Ok(())
     }
 
-    pub fn set_location(&mut self, location: impl Into<String>) -> Result<()> {
-        let location = location.into().trim().to_string();
-        if location.is_empty() {
-            return Err(MaError::EmptyLocation);
+    pub fn set_presence_hint(&mut self, hint: impl Into<String>) -> Result<()> {
+        let hint = hint.into().trim().to_string();
+        if hint.is_empty() {
+            return Err(MaError::EmptyPresenceHint);
         }
-        self.ma_location = Some(location);
+        self.ma_presence_hint = Some(hint);
         Ok(())
     }
 
-    pub fn clear_location(&mut self) {
-        self.ma_location = None;
+    pub fn clear_presence_hint(&mut self) {
+        self.ma_presence_hint = None;
     }
 
     pub fn set_locale(&mut self, locale: impl Into<String>) -> Result<()> {
@@ -410,9 +410,9 @@ impl Document {
             Cid::try_from(identity.as_str()).map_err(|_| MaError::InvalidIdentity)?;
         }
 
-        if let Some(location) = &self.ma_location {
-            if location.trim().is_empty() {
-                return Err(MaError::EmptyLocation);
+        if let Some(hint) = &self.ma_presence_hint {
+            if hint.trim().is_empty() {
+                return Err(MaError::EmptyPresenceHint);
             }
         }
 

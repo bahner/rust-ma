@@ -9,6 +9,8 @@ pub const DID_PREFIX: &str = "did:ma:";
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Did {
     pub ipns: String,
+    /// Local atom/inbox name (for example an avatar inbox in a world).
+    /// In practice this often matches a Kubo key name, but this coupling is loose.
     pub fragment: Option<String>,
 }
 
@@ -45,6 +47,10 @@ impl Did {
             ipns: self.ipns.clone(),
             fragment: None,
         }
+    }
+
+    pub fn with_fragment(&self, fragment: impl Into<String>) -> Result<Self> {
+        Self::new_fragment(self.ipns.clone(), fragment)
     }
 
     pub fn id(&self) -> String {

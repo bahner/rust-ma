@@ -76,8 +76,8 @@ pub enum MaError {
     MissingTopicId,
     #[error("topic type missing")]
     MissingTopicType,
-    #[error("location is empty")]
-    EmptyLocation,
+    #[error("presence hint is empty")]
+    EmptyPresenceHint,
     #[error("locale is empty")]
     EmptyLocale,
     #[error("identity CID is invalid")]
