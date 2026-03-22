@@ -157,7 +157,8 @@ impl Message {
             return Err(MaError::MissingSignature);
         }
 
-        if sender_document.id != self.from {
+        let sender_root = Did::try_from(self.from.as_str())?.without_fragment().id();
+        if sender_document.id != sender_root {
             return Err(MaError::InvalidRecipient);
         }
 
