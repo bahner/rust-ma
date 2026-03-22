@@ -6,6 +6,7 @@ use ed25519_dalek::{Signature, Verifier};
 use nanoid::nanoid;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::{SystemTime, UNIX_EPOCH};
 use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret};
 
@@ -20,15 +21,17 @@ use crate::{
 pub const MESSAGE_PREFIX: &str = "/ma/";
 
 /// Generic / fallback ma message
-pub const DEFAULT_CONTENT_TYPE: &str = "application/x.ma";
-/// Human chat text (replaces the Chatter envelope variant)
-pub const CONTENT_TYPE_CHAT: &str = "application/x.ma.chat";
+pub const DEFAULT_CONTENT_TYPE: &str = "application/x-ma";
+/// Human chat text broadcast to a room
+pub const CONTENT_TYPE_CHAT: &str = "application/x-ma-chat";
 /// Presence events: arrival, departure, room change
-pub const CONTENT_TYPE_PRESENCE: &str = "application/x.ma.presence";
-/// Room and actor commands (replaces RoomCommand / ActorCommand)
-pub const CONTENT_TYPE_COMMAND: &str = "application/x.ma.command";
+pub const CONTENT_TYPE_PRESENCE: &str = "application/x-ma-presence";
+/// Room and actor commands
+pub const CONTENT_TYPE_COMMAND: &str = "application/x-ma-command";
 /// DID document update published by an avatar or agent
-pub const CONTENT_TYPE_DOC: &str = "application/x.ma.doc";
+pub const CONTENT_TYPE_DOC: &str = "application/x-ma-doc";
+/// End-to-end encrypted whisper between two actors (content encrypted with recipient enc key)
+pub const CONTENT_TYPE_WHISPER: &str = "application/x-ma-whisper";
 
 pub const DEFAULT_REPLAY_WINDOW_SECS: u64 = 120;
 pub const DEFAULT_MAX_CLOCK_SKEW_SECS: u64 = 30;
@@ -390,6 +393,13 @@ fn validate_message_type(kind: &str) -> Result<()> {
 }
 
 fn now_unix_secs() -> Result<u64> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        // Browser/WASM environments may not support SystemTime::now reliably.
+        return Ok((js_sys::Date::now() / 1000.0) as u64);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs())
