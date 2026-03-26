@@ -112,6 +112,33 @@ impl Proof {
     }
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MaFields {
+    #[serde(rename = "presenceHint", skip_serializing_if = "Option::is_none")]
+    pub presence_hint: Option<String>,
+    #[serde(rename = "currentInbox", skip_serializing_if = "Option::is_none")]
+    pub current_inbox: Option<String>,
+    #[serde(rename = "locale", skip_serializing_if = "Option::is_none")]
+    pub locale: Option<String>,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(rename = "world", skip_serializing_if = "Option::is_none")]
+    pub world: Option<String>,
+    #[serde(rename = "transports", skip_serializing_if = "Option::is_none")]
+    pub transports: Option<serde_json::Value>,
+}
+
+impl MaFields {
+    fn is_empty(&self) -> bool {
+        self.presence_hint.is_none()
+            && self.current_inbox.is_none()
+            && self.locale.is_none()
+            && self.kind.is_none()
+            && self.world.is_none()
+            && self.transports.is_none()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Document {
     #[serde(rename = "@context")]
@@ -127,10 +154,8 @@ pub struct Document {
     pub proof: Proof,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identity: Option<String>,
-    #[serde(rename = "ma:presenceHint", skip_serializing_if = "Option::is_none")]
-    pub ma_presence_hint: Option<String>,
-    #[serde(rename = "ma:locale", skip_serializing_if = "Option::is_none")]
-    pub ma_locale: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ma: Option<MaFields>,
 }
 
 impl Document {
@@ -144,8 +169,17 @@ impl Document {
             key_agreement: String::new(),
             proof: Proof::default(),
             identity: None,
-            ma_presence_hint: None,
-            ma_locale: None,
+            ma: None,
+        }
+    }
+
+    fn ensure_ma_mut(&mut self) -> &mut MaFields {
+        self.ma.get_or_insert_with(MaFields::default)
+    }
+
+    fn clear_ma_if_empty(&mut self) {
+        if self.ma.as_ref().is_some_and(MaFields::is_empty) {
+            self.ma = None;
         }
     }
 
@@ -218,12 +252,34 @@ impl Document {
         if hint.is_empty() {
             return Err(MaError::EmptyPresenceHint);
         }
-        self.ma_presence_hint = Some(hint);
+        self.ensure_ma_mut().presence_hint = Some(hint);
         Ok(())
     }
 
     pub fn clear_presence_hint(&mut self) {
-        self.ma_presence_hint = None;
+        if let Some(ma) = &mut self.ma {
+            ma.presence_hint = None;
+        }
+        self.clear_ma_if_empty();
+    }
+
+    pub fn set_ma_current_inbox(&mut self, inbox: impl Into<String>) {
+        let inbox = inbox.into().trim().to_string();
+        if inbox.is_empty() {
+            if let Some(ma) = &mut self.ma {
+                ma.current_inbox = None;
+            }
+            self.clear_ma_if_empty();
+            return;
+        }
+        self.ensure_ma_mut().current_inbox = Some(inbox);
+    }
+
+    pub fn clear_ma_current_inbox(&mut self) {
+        if let Some(ma) = &mut self.ma {
+            ma.current_inbox = None;
+        }
+        self.clear_ma_if_empty();
     }
 
     pub fn set_locale(&mut self, locale: impl Into<String>) -> Result<()> {
@@ -231,12 +287,64 @@ impl Document {
         if locale.is_empty() {
             return Err(MaError::EmptyLocale);
         }
-        self.ma_locale = Some(locale);
+        self.ensure_ma_mut().locale = Some(locale);
         Ok(())
     }
 
     pub fn clear_locale(&mut self) {
-        self.ma_locale = None;
+        if let Some(ma) = &mut self.ma {
+            ma.locale = None;
+        }
+        self.clear_ma_if_empty();
+    }
+
+    pub fn set_ma_type(&mut self, kind: impl Into<String>) {
+        let kind = kind.into().trim().to_string();
+        if kind.is_empty() {
+            if let Some(ma) = &mut self.ma {
+                ma.kind = None;
+            }
+            self.clear_ma_if_empty();
+            return;
+        }
+        self.ensure_ma_mut().kind = Some(kind);
+    }
+
+    pub fn clear_ma_type(&mut self) {
+        if let Some(ma) = &mut self.ma {
+            ma.kind = None;
+        }
+        self.clear_ma_if_empty();
+    }
+
+    pub fn set_ma_world(&mut self, world_did: impl Into<String>) {
+        let world_did = world_did.into().trim().to_string();
+        if world_did.is_empty() {
+            if let Some(ma) = &mut self.ma {
+                ma.world = None;
+            }
+            self.clear_ma_if_empty();
+            return;
+        }
+        self.ensure_ma_mut().world = Some(world_did);
+    }
+
+    pub fn clear_ma_world(&mut self) {
+        if let Some(ma) = &mut self.ma {
+            ma.world = None;
+        }
+        self.clear_ma_if_empty();
+    }
+
+    pub fn set_ma_transports(&mut self, transports: serde_json::Value) {
+        self.ensure_ma_mut().transports = Some(transports);
+    }
+
+    pub fn clear_ma_transports(&mut self) {
+        if let Some(ma) = &mut self.ma {
+            ma.transports = None;
+        }
+        self.clear_ma_if_empty();
     }
 
     pub fn assertion_method_public_key(&self) -> Result<VerifyingKey> {
@@ -334,13 +442,13 @@ impl Document {
             Cid::try_from(identity.as_str()).map_err(|_| MaError::InvalidIdentity)?;
         }
 
-        if let Some(hint) = &self.ma_presence_hint {
+        if let Some(hint) = self.ma.as_ref().and_then(|ma| ma.presence_hint.as_ref()) {
             if hint.trim().is_empty() {
                 return Err(MaError::EmptyPresenceHint);
             }
         }
 
-        if let Some(locale) = &self.ma_locale {
+        if let Some(locale) = self.ma.as_ref().and_then(|ma| ma.locale.as_ref()) {
             if locale.trim().is_empty() {
                 return Err(MaError::EmptyLocale);
             }

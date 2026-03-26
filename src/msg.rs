@@ -66,9 +66,16 @@ impl Headers {
         }
 
         Did::validate(&self.from)?;
-        Did::validate(&self.to).map_err(|_| MaError::InvalidRecipient)?;
-        if self.from == self.to {
-            return Err(MaError::SameActor);
+        let recipient_is_empty = self.to.trim().is_empty();
+        if recipient_is_empty {
+            if self.content_type != CONTENT_TYPE_CHAT {
+                return Err(MaError::InvalidRecipient);
+            }
+        } else {
+            Did::validate(&self.to).map_err(|_| MaError::InvalidRecipient)?;
+            if self.from == self.to {
+                return Err(MaError::SameActor);
+            }
         }
         validate_message_freshness(self.created_at)?;
 
@@ -678,5 +685,38 @@ mod tests {
             &mut replay_guard,
         );
         assert!(matches!(second, Err(MaError::ReplayDetected)));
+    }
+
+    #[test]
+    fn chat_allows_empty_recipient() {
+        let (sender_signing, _, sender_document, _, _, _) = fixture_documents();
+        let message = Message::new(
+            sender_document.id.clone(),
+            String::new(),
+            CONTENT_TYPE_CHAT,
+            b"hello room".to_vec(),
+            &sender_signing,
+        )
+        .expect("chat message creation");
+
+        message
+            .verify_with_document(&sender_document)
+            .expect("chat with empty recipient verifies");
+    }
+
+    #[test]
+    fn non_chat_rejects_empty_recipient() {
+        let (sender_signing, _, sender_document, _, _, _) = fixture_documents();
+        let message = Message::new(
+            sender_document.id.clone(),
+            String::new(),
+            CONTENT_TYPE_COMMAND,
+            b"look".to_vec(),
+            &sender_signing,
+        )
+        .expect("command message creation");
+
+        let result = message.verify_with_document(&sender_document);
+        assert!(matches!(result, Err(MaError::InvalidRecipient)));
     }
 }
