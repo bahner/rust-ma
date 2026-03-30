@@ -114,6 +114,8 @@ impl Proof {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MaFields {
+    #[serde(rename = "/", skip_serializing_if = "Option::is_none")]
+    pub link: Option<String>,
     #[serde(rename = "presenceHint", skip_serializing_if = "Option::is_none")]
     pub presence_hint: Option<String>,
     #[serde(rename = "currentInbox", skip_serializing_if = "Option::is_none")]
@@ -126,6 +128,10 @@ pub struct MaFields {
     pub world: Option<String>,
     #[serde(rename = "transports", skip_serializing_if = "Option::is_none")]
     pub transports: Option<serde_json::Value>,
+    #[serde(rename = "stateCid", skip_serializing_if = "Option::is_none")]
+    pub state_cid: Option<String>,
+    #[serde(rename = "worldRootCid", skip_serializing_if = "Option::is_none")]
+    pub world_root_cid: Option<String>,
 }
 
 impl MaFields {
@@ -136,6 +142,9 @@ impl MaFields {
             && self.kind.is_none()
             && self.world.is_none()
             && self.transports.is_none()
+            && self.link.is_none()
+            && self.state_cid.is_none()
+            && self.world_root_cid.is_none()
     }
 }
 
@@ -343,6 +352,63 @@ impl Document {
     pub fn clear_ma_transports(&mut self) {
         if let Some(ma) = &mut self.ma {
             ma.transports = None;
+        }
+        self.clear_ma_if_empty();
+    }
+
+    pub fn set_ma_link(&mut self, link: impl Into<String>) {
+        let value = link.into().trim().to_string();
+        if value.is_empty() {
+            if let Some(ma) = &mut self.ma {
+                ma.link = None;
+            }
+            self.clear_ma_if_empty();
+            return;
+        }
+        self.ensure_ma_mut().link = Some(value);
+    }
+
+    pub fn clear_ma_link(&mut self) {
+        if let Some(ma) = &mut self.ma {
+            ma.link = None;
+        }
+        self.clear_ma_if_empty();
+    }
+
+    pub fn set_ma_state_cid(&mut self, cid: impl Into<String>) {
+        let value = cid.into().trim().to_string();
+        if value.is_empty() {
+            if let Some(ma) = &mut self.ma {
+                ma.state_cid = None;
+            }
+            self.clear_ma_if_empty();
+            return;
+        }
+        self.ensure_ma_mut().state_cid = Some(value);
+    }
+
+    pub fn clear_ma_state_cid(&mut self) {
+        if let Some(ma) = &mut self.ma {
+            ma.state_cid = None;
+        }
+        self.clear_ma_if_empty();
+    }
+
+    pub fn set_ma_world_root_cid(&mut self, cid: impl Into<String>) {
+        let value = cid.into().trim().to_string();
+        if value.is_empty() {
+            if let Some(ma) = &mut self.ma {
+                ma.world_root_cid = None;
+            }
+            self.clear_ma_if_empty();
+            return;
+        }
+        self.ensure_ma_mut().world_root_cid = Some(value);
+    }
+
+    pub fn clear_ma_world_root_cid(&mut self) {
+        if let Some(ma) = &mut self.ma {
+            ma.world_root_cid = None;
         }
         self.clear_ma_if_empty();
     }

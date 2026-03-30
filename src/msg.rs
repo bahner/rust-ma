@@ -26,8 +26,12 @@ pub const DEFAULT_CONTENT_TYPE: &str = "application/x-ma";
 pub const CONTENT_TYPE_CHAT: &str = "application/x-ma-chat";
 /// Presence events: arrival, departure, room change
 pub const CONTENT_TYPE_PRESENCE: &str = "application/x-ma-presence";
-/// Room and actor commands
-pub const CONTENT_TYPE_COMMAND: &str = "application/x-ma-command";
+/// In-game commands sent over ma/cmd/1
+pub const CONTENT_TYPE_CMD: &str = "application/x-ma-cmd";
+/// World operations (enter, leave, @@) sent over ma/world/1
+pub const CONTENT_TYPE_WORLD: &str = "application/x-ma-world";
+/// Room and world PA announcements pushed over ma/broadcast/1
+pub const CONTENT_TYPE_BROADCAST: &str = "application/x-ma-broadcast";
 /// DID document update published by an avatar or agent
 pub const CONTENT_TYPE_DOC: &str = "application/x-ma-doc";
 /// End-to-end encrypted whisper between two actors (content encrypted with recipient enc key)
@@ -710,7 +714,7 @@ mod tests {
         let message = Message::new(
             sender_document.id.clone(),
             String::new(),
-            CONTENT_TYPE_COMMAND,
+            CONTENT_TYPE_CMD,
             b"look".to_vec(),
             &sender_signing,
         )

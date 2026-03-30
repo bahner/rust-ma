@@ -5,21 +5,25 @@ A Rust library for DID- and message-oriented identity primitives used by the ma 
 ## What It Provides
 
 - DID parsing/validation (`did:ma:*`) with root and fragment handling
-- DID document model (`Document`, `VerificationMethod`, `Proof`, `Host`, `Topic`)
-- Signing/encryption key helpers (`SigningKey`, `EncryptionKey`)
+- DID document model (`Document`, `VerificationMethod`, `Proof`, `MaFields`)
+- Signing/encryption key helpers (`SigningKey`, `EncryptionKey`) using Ed25519 and X25519
+- Multiformat encoding pipeline (multibase + multicodec) for public keys and signatures
 - Envelope/message primitives with replay protection (`Message`, `Envelope`, `ReplayGuard`)
+- Proof type: `MultiformatSignature2023` (BLAKE3 + Ed25519 over CBOR-serialized documents)
 - Serialization helpers owned by the crate:
   - `Document::marshal()` / `Document::unmarshal()` for JSON
   - `Document::to_cbor()` / `Document::from_cbor()` for CBOR
 
 ## Project Layout
 
+- `src/constants.rs`: method name, version, BLAKE3 labels
 - `src/did.rs`: DID model and validation
-- `src/doc.rs`: DID document + proof model
-- `src/key.rs`: key generation and multibase handling
-- `src/msg.rs`: envelope/message structures and replay guard
+- `src/doc.rs`: DID document, proof, and verification method model
 - `src/error.rs`: crate error types
+- `src/key.rs`: key generation, multibase encoding, Ed25519/X25519 key types
 - `src/lib.rs`: public exports
+- `src/msg.rs`: message, headers, envelope, and replay guard
+- `src/multiformat.rs`: multibase/multicodec encoding and decoding pipeline
 
 ## Build and Cleanup
 
@@ -58,4 +62,6 @@ Example flow:
 ## Notes
 
 - This is a library crate; consumer crates compile it transitively.
+- Direct document formatting should remain inside `did-ma` APIs.
+- See [ma-spec](../ma-spec/) for the formal DID method specification intended for W3C registration.
 - Direct document formatting should remain inside `did-ma` APIs.
