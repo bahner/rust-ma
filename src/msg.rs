@@ -20,23 +20,6 @@ use crate::{
 
 pub const MESSAGE_PREFIX: &str = "/ma/";
 
-/// Generic / fallback ma message
-pub const DEFAULT_CONTENT_TYPE: &str = "application/x-ma";
-/// Human chat text broadcast to a room
-pub const CONTENT_TYPE_CHAT: &str = "application/x-ma-chat";
-/// Presence events: arrival, departure, room change
-pub const CONTENT_TYPE_PRESENCE: &str = "application/x-ma-presence";
-/// In-game commands sent over ma/cmd/1
-pub const CONTENT_TYPE_CMD: &str = "application/x-ma-cmd";
-/// World operations (enter, leave, @@) sent over ma/world/1
-pub const CONTENT_TYPE_WORLD: &str = "application/x-ma-world";
-/// Room and world PA announcements pushed over ma/broadcast/1
-pub const CONTENT_TYPE_BROADCAST: &str = "application/x-ma-broadcast";
-/// DID document update published by an avatar or agent
-pub const CONTENT_TYPE_DOC: &str = "application/x-ma-doc";
-/// End-to-end encrypted whisper between two actors (content encrypted with recipient enc key)
-pub const CONTENT_TYPE_WHISPER: &str = "application/x-ma-whisper";
-
 pub const DEFAULT_REPLAY_WINDOW_SECS: u64 = 120;
 pub const DEFAULT_MAX_CLOCK_SKEW_SECS: u64 = 30;
 
@@ -55,6 +38,8 @@ pub struct Headers {
     pub created_at: u64,
     #[serde(rename = "contentType")]
     pub content_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "replyTo")]
+    pub reply_to: Option<String>,
     #[serde(rename = "contentHash")]
     pub content_hash: [u8; 32],
     pub signature: Vec<u8>,
@@ -64,6 +49,9 @@ impl Headers {
     pub fn validate(&self) -> Result<()> {
         validate_message_id(&self.id)?;
         validate_message_type(&self.message_type)?;
+        if let Some(reply_to) = &self.reply_to {
+            validate_message_id(reply_to)?;
+        }
 
         if self.content_type.is_empty() {
             return Err(MaError::MissingContentType);
@@ -72,7 +60,7 @@ impl Headers {
         Did::validate(&self.from)?;
         let recipient_is_empty = self.to.trim().is_empty();
         if recipient_is_empty {
-            if self.content_type != CONTENT_TYPE_CHAT {
+            if self.content_type != "application/x-ma-chat" {
                 return Err(MaError::InvalidRecipient);
             }
         } else {
@@ -98,6 +86,8 @@ pub struct Message {
     pub created_at: u64,
     #[serde(rename = "contentType")]
     pub content_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "replyTo")]
+    pub reply_to: Option<String>,
     pub content: Vec<u8>,
     pub signature: Vec<u8>,
 }
@@ -117,6 +107,7 @@ impl Message {
             to: to.into(),
             created_at: now_unix_secs()?,
             content_type: content_type.into(),
+            reply_to: None,
             content,
             signature: Vec::new(),
         };
@@ -145,6 +136,7 @@ impl Message {
             to: self.to.clone(),
             created_at: self.created_at,
             content_type: self.content_type.clone(),
+            reply_to: self.reply_to.clone(),
             content_hash: content_hash(&self.content),
             signature: Vec::new(),
         }
@@ -240,6 +232,7 @@ impl Message {
             to: headers.to,
             created_at: headers.created_at,
             content_type: headers.content_type,
+            reply_to: headers.reply_to,
             content: Vec::new(),
             signature: headers.signature,
         })
@@ -582,7 +575,7 @@ mod tests {
         let message = Message::new(
             sender_document.id.clone(),
             recipient_document.id.clone(),
-            DEFAULT_CONTENT_TYPE,
+            "application/x-ma",
             b"look".to_vec(),
             &sender_signing,
         )
@@ -611,7 +604,7 @@ mod tests {
         let mut message = Message::new(
             sender_document.id.clone(),
             recipient_document.id.clone(),
-            DEFAULT_CONTENT_TYPE,
+            "application/x-ma",
             b"look".to_vec(),
             &sender_signing,
         )
@@ -628,7 +621,7 @@ mod tests {
         let mut message = Message::new(
             sender_document.id.clone(),
             recipient_document.id.clone(),
-            DEFAULT_CONTENT_TYPE,
+            "application/x-ma",
             b"look".to_vec(),
             &sender_signing,
         )
@@ -645,7 +638,7 @@ mod tests {
         let mut message = Message::new(
             sender_document.id.clone(),
             recipient_document.id.clone(),
-            DEFAULT_CONTENT_TYPE,
+            "application/x-ma",
             b"look".to_vec(),
             &sender_signing,
         )
@@ -664,7 +657,7 @@ mod tests {
         let message = Message::new(
             sender_document.id.clone(),
             recipient_document.id.clone(),
-            DEFAULT_CONTENT_TYPE,
+            "application/x-ma",
             b"look".to_vec(),
             &sender_signing,
         )
@@ -697,7 +690,7 @@ mod tests {
         let message = Message::new(
             sender_document.id.clone(),
             String::new(),
-            CONTENT_TYPE_CHAT,
+            "application/x-ma-chat",
             b"hello room".to_vec(),
             &sender_signing,
         )
@@ -714,7 +707,7 @@ mod tests {
         let message = Message::new(
             sender_document.id.clone(),
             String::new(),
-            CONTENT_TYPE_CMD,
+            "application/x-ma-cmd",
             b"look".to_vec(),
             &sender_signing,
         )

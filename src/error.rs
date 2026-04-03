@@ -70,8 +70,10 @@ pub enum MaError {
     InvalidMessageSignature,
     #[error("presence hint is empty")]
     EmptyPresenceHint,
-    #[error("locale is empty")]
-    EmptyLocale,
+    #[error("lang is empty")]
+    EmptyLang,
+    #[error("language preference list is empty")]
+    EmptyLanguagePreference,
     #[error("identity CID is invalid")]
     InvalidIdentity,
     #[error("missing envelope field: {0}")]

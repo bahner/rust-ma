@@ -120,8 +120,10 @@ pub struct MaFields {
     pub presence_hint: Option<String>,
     #[serde(rename = "currentInbox", skip_serializing_if = "Option::is_none")]
     pub current_inbox: Option<String>,
-    #[serde(rename = "locale", skip_serializing_if = "Option::is_none")]
-    pub locale: Option<String>,
+    #[serde(rename = "lang", skip_serializing_if = "Option::is_none")]
+    pub lang: Option<String>,
+    #[serde(rename = "language", skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub kind: Option<String>,
     #[serde(rename = "world", skip_serializing_if = "Option::is_none")]
@@ -138,7 +140,8 @@ impl MaFields {
     fn is_empty(&self) -> bool {
         self.presence_hint.is_none()
             && self.current_inbox.is_none()
-            && self.locale.is_none()
+            && self.lang.is_none()
+            && self.language.is_none()
             && self.kind.is_none()
             && self.world.is_none()
             && self.transports.is_none()
@@ -291,18 +294,34 @@ impl Document {
         self.clear_ma_if_empty();
     }
 
-    pub fn set_locale(&mut self, locale: impl Into<String>) -> Result<()> {
-        let locale = locale.into().trim().to_string();
-        if locale.is_empty() {
-            return Err(MaError::EmptyLocale);
+    pub fn set_lang(&mut self, lang: impl Into<String>) -> Result<()> {
+        let lang = lang.into().trim().to_string();
+        if lang.is_empty() {
+            return Err(MaError::EmptyLang);
         }
-        self.ensure_ma_mut().locale = Some(locale);
+        self.ensure_ma_mut().lang = Some(lang);
         Ok(())
     }
 
-    pub fn clear_locale(&mut self) {
+    pub fn clear_lang(&mut self) {
         if let Some(ma) = &mut self.ma {
-            ma.locale = None;
+            ma.lang = None;
+        }
+        self.clear_ma_if_empty();
+    }
+
+    pub fn set_language(&mut self, language: impl Into<String>) -> Result<()> {
+        let language = language.into().trim().to_string();
+        if language.is_empty() {
+            return Err(MaError::EmptyLanguagePreference);
+        }
+        self.ensure_ma_mut().language = Some(language);
+        Ok(())
+    }
+
+    pub fn clear_language(&mut self) {
+        if let Some(ma) = &mut self.ma {
+            ma.language = None;
         }
         self.clear_ma_if_empty();
     }
@@ -514,9 +533,15 @@ impl Document {
             }
         }
 
-        if let Some(locale) = self.ma.as_ref().and_then(|ma| ma.locale.as_ref()) {
-            if locale.trim().is_empty() {
-                return Err(MaError::EmptyLocale);
+        if let Some(lang) = self.ma.as_ref().and_then(|ma| ma.lang.as_ref()) {
+            if lang.trim().is_empty() {
+                return Err(MaError::EmptyLang);
+            }
+        }
+
+        if let Some(language) = self.ma.as_ref().and_then(|ma| ma.language.as_ref()) {
+            if language.trim().is_empty() {
+                return Err(MaError::EmptyLanguagePreference);
             }
         }
 
