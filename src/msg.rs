@@ -22,6 +22,11 @@ pub const MESSAGE_PREFIX: &str = "/ma/";
 
 pub const DEFAULT_REPLAY_WINDOW_SECS: u64 = 120;
 pub const DEFAULT_MAX_CLOCK_SKEW_SECS: u64 = 30;
+pub const DEFAULT_MESSAGE_TTL_SECS: u64 = 3600;
+
+fn default_message_ttl_secs() -> u64 {
+    DEFAULT_MESSAGE_TTL_SECS
+}
 
 pub fn message_type() -> String {
     format!("{MESSAGE_PREFIX}{}", constants::VERSION)
@@ -36,6 +41,8 @@ pub struct Headers {
     pub to: String,
     #[serde(rename = "createdAt")]
     pub created_at: u64,
+    #[serde(default = "default_message_ttl_secs")]
+    pub ttl: u64,
     #[serde(rename = "contentType")]
     pub content_type: String,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "replyTo")]
@@ -69,7 +76,7 @@ impl Headers {
                 return Err(MaError::SameActor);
             }
         }
-        validate_message_freshness(self.created_at)?;
+        validate_message_freshness(self.created_at, self.ttl)?;
 
         Ok(())
     }
@@ -84,6 +91,8 @@ pub struct Message {
     pub to: String,
     #[serde(rename = "createdAt")]
     pub created_at: u64,
+    #[serde(default = "default_message_ttl_secs")]
+    pub ttl: u64,
     #[serde(rename = "contentType")]
     pub content_type: String,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "replyTo")]
@@ -100,12 +109,31 @@ impl Message {
         content: Vec<u8>,
         signing_key: &SigningKey,
     ) -> Result<Self> {
+        Self::new_with_ttl(
+            from,
+            to,
+            content_type,
+            content,
+            DEFAULT_MESSAGE_TTL_SECS,
+            signing_key,
+        )
+    }
+
+    pub fn new_with_ttl(
+        from: impl Into<String>,
+        to: impl Into<String>,
+        content_type: impl Into<String>,
+        content: Vec<u8>,
+        ttl: u64,
+        signing_key: &SigningKey,
+    ) -> Result<Self> {
         let mut message = Self {
             id: nanoid!(),
             message_type: message_type(),
             from: from.into(),
             to: to.into(),
             created_at: now_unix_secs()?,
+            ttl,
             content_type: content_type.into(),
             reply_to: None,
             content,
@@ -135,6 +163,7 @@ impl Message {
             from: self.from.clone(),
             to: self.to.clone(),
             created_at: self.created_at,
+            ttl: self.ttl,
             content_type: self.content_type.clone(),
             reply_to: self.reply_to.clone(),
             content_hash: content_hash(&self.content),
@@ -231,6 +260,7 @@ impl Message {
             from: headers.from,
             to: headers.to,
             created_at: headers.created_at,
+            ttl: headers.ttl,
             content_type: headers.content_type,
             reply_to: headers.reply_to,
             content: Vec::new(),
@@ -410,14 +440,18 @@ fn now_unix_secs() -> Result<u64> {
         .map_err(|_| MaError::InvalidMessageTimestamp)
 }
 
-fn validate_message_freshness(created_at: u64) -> Result<()> {
+fn validate_message_freshness(created_at: u64, ttl: u64) -> Result<()> {
     let now = now_unix_secs()?;
 
     if created_at > now.saturating_add(DEFAULT_MAX_CLOCK_SKEW_SECS) {
         return Err(MaError::MessageFromFuture);
     }
 
-    if now.saturating_sub(created_at) > DEFAULT_REPLAY_WINDOW_SECS {
+    if ttl == 0 {
+        return Ok(());
+    }
+
+    if now.saturating_sub(created_at) > ttl {
         return Err(MaError::MessageTooOld);
     }
 
@@ -649,6 +683,47 @@ mod tests {
 
         let result = message.verify_with_document(&sender_document);
         assert!(matches!(result, Err(MaError::MessageFromFuture)));
+    }
+
+    #[test]
+    fn ttl_zero_disables_expiration() {
+        let (sender_signing, _, sender_document, _, _, recipient_document) = fixture_documents();
+        let mut message = Message::new(
+            sender_document.id.clone(),
+            recipient_document.id.clone(),
+            "application/x-ma",
+            b"look".to_vec(),
+            &sender_signing,
+        )
+        .expect("message creation");
+
+        message.created_at = 0;
+        message.ttl = 0;
+        message.sign(&sender_signing).expect("re-sign with ttl=0");
+
+        message
+            .verify_with_document(&sender_document)
+            .expect("ttl=0 should bypass max-age rejection");
+    }
+
+    #[test]
+    fn custom_ttl_rejects_expired_message() {
+        let (sender_signing, _, sender_document, _, _, recipient_document) = fixture_documents();
+        let mut message = Message::new_with_ttl(
+            sender_document.id.clone(),
+            recipient_document.id.clone(),
+            "application/x-ma",
+            b"look".to_vec(),
+            1,
+            &sender_signing,
+        )
+        .expect("message creation with ttl");
+
+        message.created_at = now_unix_secs().expect("current timestamp").saturating_sub(5);
+        message.sign(&sender_signing).expect("re-sign with stale timestamp");
+
+        let result = message.verify_with_document(&sender_document);
+        assert!(matches!(result, Err(MaError::MessageTooOld)));
     }
 
     #[test]

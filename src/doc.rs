@@ -128,12 +128,22 @@ pub struct MaFields {
     pub kind: Option<String>,
     #[serde(rename = "world", skip_serializing_if = "Option::is_none")]
     pub world: Option<String>,
+    #[serde(rename = "requestedTTL", skip_serializing_if = "Option::is_none")]
+    pub requested_ttl: Option<u64>,
     #[serde(rename = "transports", skip_serializing_if = "Option::is_none")]
     pub transports: Option<serde_json::Value>,
     #[serde(rename = "stateCid", skip_serializing_if = "Option::is_none")]
     pub state_cid: Option<String>,
     #[serde(rename = "worldRootCid", skip_serializing_if = "Option::is_none")]
     pub world_root_cid: Option<String>,
+    #[serde(rename = "created", skip_serializing_if = "Option::is_none")]
+    pub created: Option<String>,
+    #[serde(rename = "updated", skip_serializing_if = "Option::is_none")]
+    pub updated: Option<String>,
+    #[serde(rename = "deactivated", skip_serializing_if = "Option::is_none")]
+    pub deactivated: Option<String>,
+    #[serde(rename = "versionId", skip_serializing_if = "Option::is_none")]
+    pub version_id: Option<String>,
 }
 
 impl MaFields {
@@ -144,10 +154,15 @@ impl MaFields {
             && self.language.is_none()
             && self.kind.is_none()
             && self.world.is_none()
+            && self.requested_ttl.is_none()
             && self.transports.is_none()
             && self.link.is_none()
             && self.state_cid.is_none()
             && self.world_root_cid.is_none()
+            && self.created.is_none()
+            && self.updated.is_none()
+            && self.deactivated.is_none()
+            && self.version_id.is_none()
     }
 }
 
@@ -364,6 +379,17 @@ impl Document {
         self.clear_ma_if_empty();
     }
 
+    pub fn set_ma_requested_ttl(&mut self, requested_ttl: u64) {
+        self.ensure_ma_mut().requested_ttl = Some(requested_ttl);
+    }
+
+    pub fn clear_ma_requested_ttl(&mut self) {
+        if let Some(ma) = &mut self.ma {
+            ma.requested_ttl = None;
+        }
+        self.clear_ma_if_empty();
+    }
+
     pub fn set_ma_transports(&mut self, transports: serde_json::Value) {
         self.ensure_ma_mut().transports = Some(transports);
     }
@@ -430,6 +456,61 @@ impl Document {
             ma.world_root_cid = None;
         }
         self.clear_ma_if_empty();
+    }
+
+    pub fn set_ma_created(&mut self, created: impl Into<String>) {
+        let value = created.into().trim().to_string();
+        if value.is_empty() {
+            if let Some(ma) = &mut self.ma {
+                ma.created = None;
+            }
+            self.clear_ma_if_empty();
+            return;
+        }
+        self.ensure_ma_mut().created = Some(value);
+    }
+
+    pub fn set_ma_updated(&mut self, updated: impl Into<String>) {
+        let value = updated.into().trim().to_string();
+        if value.is_empty() {
+            if let Some(ma) = &mut self.ma {
+                ma.updated = None;
+            }
+            self.clear_ma_if_empty();
+            return;
+        }
+        self.ensure_ma_mut().updated = Some(value);
+    }
+
+    pub fn set_ma_deactivated(&mut self, deactivated: impl Into<String>) {
+        let value = deactivated.into().trim().to_string();
+        if value.is_empty() {
+            if let Some(ma) = &mut self.ma {
+                ma.deactivated = None;
+            }
+            self.clear_ma_if_empty();
+            return;
+        }
+        self.ensure_ma_mut().deactivated = Some(value);
+    }
+
+    pub fn clear_ma_deactivated(&mut self) {
+        if let Some(ma) = &mut self.ma {
+            ma.deactivated = None;
+        }
+        self.clear_ma_if_empty();
+    }
+
+    pub fn set_ma_version_id(&mut self, version_id: impl Into<String>) {
+        let value = version_id.into().trim().to_string();
+        if value.is_empty() {
+            if let Some(ma) = &mut self.ma {
+                ma.version_id = None;
+            }
+            self.clear_ma_if_empty();
+            return;
+        }
+        self.ensure_ma_mut().version_id = Some(value);
     }
 
     pub fn assertion_method_public_key(&self) -> Result<VerifyingKey> {
@@ -542,6 +623,24 @@ impl Document {
         if let Some(language) = self.ma.as_ref().and_then(|ma| ma.language.as_ref()) {
             if language.trim().is_empty() {
                 return Err(MaError::EmptyLanguagePreference);
+            }
+        }
+
+        if let Some(created) = self.ma.as_ref().and_then(|ma| ma.created.as_ref()) {
+            if created.trim().is_empty() {
+                return Err(MaError::JsonDecode("ma.created cannot be empty".to_string()));
+            }
+        }
+
+        if let Some(updated) = self.ma.as_ref().and_then(|ma| ma.updated.as_ref()) {
+            if updated.trim().is_empty() {
+                return Err(MaError::JsonDecode("ma.updated cannot be empty".to_string()));
+            }
+        }
+
+        if let Some(version_id) = self.ma.as_ref().and_then(|ma| ma.version_id.as_ref()) {
+            if version_id.trim().is_empty() {
+                return Err(MaError::JsonDecode("ma.versionId cannot be empty".to_string()));
             }
         }
 
