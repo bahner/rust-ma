@@ -1,6 +1,6 @@
 use chacha20poly1305::{
-    aead::{Aead, AeadCore, KeyInit},
     Key, XChaCha20Poly1305, XNonce,
+    aead::{Aead, AeadCore, KeyInit},
 };
 use ed25519_dalek::{Signature, Verifier};
 use nanoid::nanoid;
@@ -199,7 +199,8 @@ impl Message {
 
         self.headers().validate()?;
         let bytes = self.unsigned_headers_cbor()?;
-        let signature = Signature::from_slice(&self.signature).map_err(|_| MaError::InvalidMessageSignature)?;
+        let signature =
+            Signature::from_slice(&self.signature).map_err(|_| MaError::InvalidMessageSignature)?;
         sender_document
             .assertion_method_public_key()?
             .verify(&bytes, &signature)
@@ -209,10 +210,13 @@ impl Message {
     pub fn enclose_for(&self, recipient_document: &Document) -> Result<Envelope> {
         self.headers().validate()?;
 
-        let recipient_public_key = X25519PublicKey::from(recipient_document.key_agreement_public_key_bytes()?);
+        let recipient_public_key =
+            X25519PublicKey::from(recipient_document.key_agreement_public_key_bytes()?);
         let ephemeral_secret = StaticSecret::random_from_rng(rand_core::OsRng);
         let ephemeral_public = X25519PublicKey::from(&ephemeral_secret);
-        let shared_secret = ephemeral_secret.diffie_hellman(&recipient_public_key).to_bytes();
+        let shared_secret = ephemeral_secret
+            .diffie_hellman(&recipient_public_key)
+            .to_bytes();
 
         let encrypted_headers = encrypt(
             &self.headers_cbor()?,
@@ -345,7 +349,12 @@ impl Envelope {
         ciborium::de::from_reader(bytes).map_err(|error| MaError::CborDecode(error.to_string()))
     }
 
-    pub fn open(&self, recipient_document: &Document, recipient_key: &EncryptionKey, sender_document: &Document) -> Result<Message> {
+    pub fn open(
+        &self,
+        recipient_document: &Document,
+        recipient_key: &EncryptionKey,
+        sender_document: &Document,
+    ) -> Result<Message> {
         self.verify()?;
 
         if recipient_document.id == sender_document.id {
@@ -411,7 +420,10 @@ fn validate_message_id(id: &str) -> Result<()> {
         return Err(MaError::EmptyMessageId);
     }
 
-    if !id.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-') {
+    if !id
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
+    {
         return Err(MaError::InvalidMessageId);
     }
 
@@ -458,9 +470,13 @@ fn validate_message_freshness(created_at: u64, ttl: u64) -> Result<()> {
     Ok(())
 }
 
-fn compute_shared_secret(ephemeral_key_bytes: &[u8], recipient_key: &EncryptionKey) -> Result<[u8; 32]> {
+fn compute_shared_secret(
+    ephemeral_key_bytes: &[u8],
+    recipient_key: &EncryptionKey,
+) -> Result<[u8; 32]> {
     let ephemeral_public = X25519PublicKey::from(
-        <[u8; 32]>::try_from(ephemeral_key_bytes).map_err(|_| MaError::InvalidEphemeralKeyLength)?,
+        <[u8; 32]>::try_from(ephemeral_key_bytes)
+            .map_err(|_| MaError::InvalidEphemeralKeyLength)?,
     );
     Ok(recipient_key.shared_secret(&ephemeral_public))
 }
@@ -489,7 +505,9 @@ fn decrypt(data: &[u8], shared_secret: &[u8; 32], label: &str) -> Result<Vec<u8>
     let cipher = XChaCha20Poly1305::new(&key);
     let nonce = XNonce::from_slice(&data[..24]);
 
-    cipher.decrypt(nonce, &data[24..]).map_err(|_| MaError::Crypto)
+    cipher
+        .decrypt(nonce, &data[24..])
+        .map_err(|_| MaError::Crypto)
 }
 
 fn content_hash(content: &[u8]) -> [u8; 32] {
@@ -501,22 +519,32 @@ mod tests {
     use super::*;
     use crate::{doc::VerificationMethod, key::EncryptionKey};
 
-    fn fixture_documents() -> (SigningKey, EncryptionKey, Document, SigningKey, EncryptionKey, Document) {
+    fn fixture_documents() -> (
+        SigningKey,
+        EncryptionKey,
+        Document,
+        SigningKey,
+        EncryptionKey,
+        Document,
+    ) {
         let sender_did = Did::new_root("k51sender").expect("sender did");
         let sender_sign_did = Did::new("k51sender", "sig").expect("sender sign did");
         let sender_enc_did = Did::new("k51sender", "enc").expect("sender enc did");
         let sender_signing = SigningKey::generate(sender_sign_did).expect("sender signing key");
-        let sender_encryption = EncryptionKey::generate(sender_enc_did).expect("sender encryption key");
+        let sender_encryption =
+            EncryptionKey::generate(sender_enc_did).expect("sender encryption key");
 
         let recipient_did = Did::new_root("k51recipient").expect("recipient did");
         let recipient_sign_did = Did::new("k51recipient", "sig").expect("recipient sign did");
         let recipient_enc_did = Did::new("k51recipient", "enc").expect("recipient enc did");
-        let recipient_signing = SigningKey::generate(recipient_sign_did).expect("recipient signing key");
-        let recipient_encryption = EncryptionKey::generate(recipient_enc_did).expect("recipient encryption key");
+        let recipient_signing =
+            SigningKey::generate(recipient_sign_did).expect("recipient signing key");
+        let recipient_encryption =
+            EncryptionKey::generate(recipient_enc_did).expect("recipient encryption key");
 
         let mut sender_document = Document::new(&sender_did, &sender_did);
         let sender_assertion = VerificationMethod::new(
-            &sender_did.id(),
+            sender_did.id(),
             sender_did.id(),
             sender_signing.key_type.clone(),
             "sig",
@@ -524,7 +552,7 @@ mod tests {
         )
         .expect("sender assertion vm");
         let sender_key_agreement = VerificationMethod::new(
-            &sender_did.id(),
+            sender_did.id(),
             sender_did.id(),
             sender_encryption.key_type.clone(),
             "enc",
@@ -539,11 +567,13 @@ mod tests {
             .expect("add sender key agreement");
         sender_document.assertion_method = sender_assertion.id.clone();
         sender_document.key_agreement = sender_key_agreement.id.clone();
-        sender_document.sign(&sender_signing, &sender_assertion).expect("sign sender doc");
+        sender_document
+            .sign(&sender_signing, &sender_assertion)
+            .expect("sign sender doc");
 
         let mut recipient_document = Document::new(&recipient_did, &recipient_did);
         let recipient_assertion = VerificationMethod::new(
-            &recipient_did.id(),
+            recipient_did.id(),
             recipient_did.id(),
             recipient_signing.key_type.clone(),
             "sig",
@@ -551,7 +581,7 @@ mod tests {
         )
         .expect("recipient assertion vm");
         let recipient_key_agreement = VerificationMethod::new(
-            &recipient_did.id(),
+            recipient_did.id(),
             recipient_did.id(),
             recipient_encryption.key_type.clone(),
             "enc",
@@ -582,8 +612,11 @@ mod tests {
 
     #[test]
     fn did_round_trip() {
-        let did = Did::new("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr", "bahner")
-            .expect("did must build");
+        let did = Did::new(
+            "k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr",
+            "bahner",
+        )
+        .expect("did must build");
         let parsed = Did::try_from(did.id().as_str()).expect("did must parse");
         assert_eq!(did, parsed);
     }
@@ -605,7 +638,8 @@ mod tests {
 
     #[test]
     fn envelope_round_trip() {
-        let (sender_signing, _, sender_document, _, recipient_encryption, recipient_document) = fixture_documents();
+        let (sender_signing, _, sender_document, _, recipient_encryption, recipient_document) =
+            fixture_documents();
         let message = Message::new(
             sender_document.id.clone(),
             recipient_document.id.clone(),
@@ -618,13 +652,11 @@ mod tests {
             .verify_with_document(&sender_document)
             .expect("message signature verifies");
 
-        let envelope = message.enclose_for(&recipient_document).expect("message encloses");
+        let envelope = message
+            .enclose_for(&recipient_document)
+            .expect("message encloses");
         let opened = envelope
-            .open(
-                &recipient_document,
-                &recipient_encryption,
-                &sender_document,
-            )
+            .open(&recipient_document, &recipient_encryption, &sender_document)
             .expect("envelope opens");
 
         assert_eq!(opened.content, b"look");
@@ -678,8 +710,11 @@ mod tests {
         )
         .expect("message creation");
 
-        message.created_at = now_unix_secs().expect("current timestamp") + DEFAULT_MAX_CLOCK_SKEW_SECS + 60;
-        message.sign(&sender_signing).expect("re-sign with updated timestamp");
+        message.created_at =
+            now_unix_secs().expect("current timestamp") + DEFAULT_MAX_CLOCK_SKEW_SECS + 60;
+        message
+            .sign(&sender_signing)
+            .expect("re-sign with updated timestamp");
 
         let result = message.verify_with_document(&sender_document);
         assert!(matches!(result, Err(MaError::MessageFromFuture)));
@@ -719,8 +754,12 @@ mod tests {
         )
         .expect("message creation with ttl");
 
-        message.created_at = now_unix_secs().expect("current timestamp").saturating_sub(5);
-        message.sign(&sender_signing).expect("re-sign with stale timestamp");
+        message.created_at = now_unix_secs()
+            .expect("current timestamp")
+            .saturating_sub(5);
+        message
+            .sign(&sender_signing)
+            .expect("re-sign with stale timestamp");
 
         let result = message.verify_with_document(&sender_document);
         assert!(matches!(result, Err(MaError::MessageTooOld)));
@@ -728,7 +767,8 @@ mod tests {
 
     #[test]
     fn replay_guard_rejects_duplicate_envelope() {
-        let (sender_signing, _, sender_document, _, recipient_encryption, recipient_document) = fixture_documents();
+        let (sender_signing, _, sender_document, _, recipient_encryption, recipient_document) =
+            fixture_documents();
         let message = Message::new(
             sender_document.id.clone(),
             recipient_document.id.clone(),
@@ -738,7 +778,9 @@ mod tests {
         )
         .expect("message creation");
 
-        let envelope = message.enclose_for(&recipient_document).expect("message encloses");
+        let envelope = message
+            .enclose_for(&recipient_document)
+            .expect("message encloses");
         let mut replay_guard = ReplayGuard::default();
 
         envelope

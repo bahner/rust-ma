@@ -21,7 +21,6 @@ pub use key::{
     SigningKey, X25519_PUB_CODEC,
 };
 pub use msg::{
-    Envelope, Headers, Message, ReplayGuard,
-    DEFAULT_MAX_CLOCK_SKEW_SECS, DEFAULT_MESSAGE_TTL_SECS, DEFAULT_REPLAY_WINDOW_SECS,
-    MESSAGE_PREFIX,
+    DEFAULT_MAX_CLOCK_SKEW_SECS, DEFAULT_MESSAGE_TTL_SECS, DEFAULT_REPLAY_WINDOW_SECS, Envelope,
+    Headers, MESSAGE_PREFIX, Message, ReplayGuard,
 };

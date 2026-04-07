@@ -74,6 +74,30 @@ pub enum MaError {
     EmptyLang,
     #[error("language preference list is empty")]
     EmptyLanguagePreference,
+    #[error("language preference must follow GNU LANGUAGE format (colon-separated language list)")]
+    InvalidLanguagePreferenceFormat,
+    #[error("invalid ma.type value: {0}. allowed values: avatar, agent, world, room, object")]
+    InvalidMaType(String),
+    #[error("invalid ma.world DID: {0}")]
+    InvalidMaWorld(String),
+    #[error("invalid ma.currentInbox value: {0}")]
+    InvalidMaCurrentInbox(String),
+    #[error("invalid ma.transports value: expected object or array")]
+    InvalidMaTransports,
+    #[error("invalid ma.link value: {0}")]
+    InvalidMaLink(String),
+    #[error("invalid ma.stateCid: {0}")]
+    InvalidMaStateCid(String),
+    #[error("invalid ma.worldRootCid: {0}")]
+    InvalidMaWorldRootCid(String),
+    #[error("invalid ma.created timestamp: {0}")]
+    InvalidMaCreated(String),
+    #[error("invalid ma.updated timestamp: {0}")]
+    InvalidMaUpdated(String),
+    #[error("invalid ma.deactivated timestamp: {0}")]
+    InvalidMaDeactivated(String),
+    #[error("invalid ma.versionId: {0}")]
+    InvalidMaVersionId(String),
     #[error("identity CID is invalid")]
     InvalidIdentity,
     #[error("missing envelope field: {0}")]

@@ -39,7 +39,7 @@ pub fn generate_agent_identity(ipns: &str) -> Result<GeneratedIdentity> {
     document.add_verification_method(key_agreement_vm.clone())?;
     document.assertion_method = assertion_vm_id;
     document.key_agreement = key_agreement_vm.id.clone();
-    document.set_ma_type("agent");
+    document.set_ma_type("agent")?;
     document.sign(&signing_key, &assertion_vm)?;
 
     Ok(GeneratedIdentity {

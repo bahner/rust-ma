@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     did::Did,
     error::{MaError, Result},
-    key::{EncryptionKey, SigningKey, ED25519_PUB_CODEC, X25519_PUB_CODEC},
+    key::{ED25519_PUB_CODEC, EncryptionKey, SigningKey, X25519_PUB_CODEC},
     multiformat::{multibase_decode, multibase_encode, public_key_multibase_decode},
 };
 
@@ -166,6 +166,115 @@ impl MaFields {
     }
 }
 
+fn is_valid_gnu_language_token(token: &str) -> bool {
+    if token.eq_ignore_ascii_case("c") || token.eq_ignore_ascii_case("posix") {
+        return true;
+    }
+    !token.is_empty()
+        && token
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | '@'))
+}
+
+fn is_valid_gnu_language_list(value: &str) -> bool {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    let mut saw_any = false;
+    for token in trimmed.split(':').map(str::trim) {
+        if token.is_empty() || !is_valid_gnu_language_token(token) {
+            return false;
+        }
+        saw_any = true;
+    }
+    saw_any
+}
+
+fn is_valid_ma_type(value: &str) -> bool {
+    matches!(value, "avatar" | "agent" | "world" | "room" | "object")
+}
+
+fn is_hex_64(value: &str) -> bool {
+    value.len() == 64 && value.chars().all(|ch| ch.is_ascii_hexdigit())
+}
+
+fn is_valid_inbox_hint(value: &str) -> bool {
+    let trimmed = value.trim();
+    if is_hex_64(trimmed) {
+        return true;
+    }
+    for prefix in ["/iroh/", "/ma-iroh/", "/iroh-ma/", "/iroh+ma/"] {
+        if let Some(rest) = trimmed.strip_prefix(prefix) {
+            let endpoint = rest.split('/').next().unwrap_or_default();
+            return is_hex_64(endpoint);
+        }
+    }
+    false
+}
+
+fn is_valid_ma_link(value: &str) -> bool {
+    let trimmed = value.trim();
+    if let Some(ipfs) = trimmed.strip_prefix("/ipfs/") {
+        return Cid::try_from(ipfs).is_ok();
+    }
+    if let Some(ipns) = trimmed.strip_prefix("/ipns/") {
+        return !ipns.trim().is_empty() && !ipns.contains(char::is_whitespace);
+    }
+    false
+}
+
+fn is_valid_rfc3339_utc(value: &str) -> bool {
+    let trimmed = value.trim();
+    // Strict enough for ISO-8601 UTC produced by current implementations.
+    if !trimmed.ends_with('Z') {
+        return false;
+    }
+    let bytes = trimmed.as_bytes();
+    if bytes.len() < 20 {
+        return false;
+    }
+    let expected_punct = [
+        (4usize, b'-'),
+        (7usize, b'-'),
+        (10usize, b'T'),
+        (13usize, b':'),
+        (16usize, b':'),
+    ];
+    if expected_punct
+        .iter()
+        .any(|(idx, punct)| bytes.get(*idx).copied() != Some(*punct))
+    {
+        return false;
+    }
+    let core_digits = [0usize, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18];
+    if core_digits.iter().any(|idx| {
+        !bytes
+            .get(*idx)
+            .copied()
+            .unwrap_or_default()
+            .is_ascii_digit()
+    }) {
+        return false;
+    }
+    let tail = &trimmed[19..trimmed.len() - 1];
+    if tail.is_empty() {
+        return true;
+    }
+    if let Some(frac) = tail.strip_prefix('.') {
+        return !frac.is_empty() && frac.chars().all(|ch| ch.is_ascii_digit());
+    }
+    false
+}
+
+fn is_valid_version_id(value: &str) -> bool {
+    let trimmed = value.trim();
+    !trimmed.is_empty()
+        && trimmed
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-' | '+'))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Document {
     #[serde(rename = "@context")]
@@ -188,7 +297,10 @@ pub struct Document {
 impl Document {
     pub fn new(identity: &Did, controller: &Did) -> Self {
         Self {
-            context: DEFAULT_DID_CONTEXT.iter().map(|value| (*value).to_string()).collect(),
+            context: DEFAULT_DID_CONTEXT
+                .iter()
+                .map(|value| (*value).to_string())
+                .collect(),
             id: identity.id(),
             controller: vec![controller.id()],
             verification_method: Vec::new(),
@@ -248,10 +360,9 @@ impl Document {
 
     pub fn add_verification_method(&mut self, method: VerificationMethod) -> Result<()> {
         method.validate()?;
-        let duplicate = self
-            .verification_method
-            .iter()
-            .any(|existing| existing.id == method.id || existing.public_key_multibase == method.public_key_multibase);
+        let duplicate = self.verification_method.iter().any(|existing| {
+            existing.id == method.id || existing.public_key_multibase == method.public_key_multibase
+        });
 
         if !duplicate {
             self.verification_method.push(method);
@@ -330,6 +441,9 @@ impl Document {
         if language.is_empty() {
             return Err(MaError::EmptyLanguagePreference);
         }
+        if !is_valid_gnu_language_list(&language) {
+            return Err(MaError::InvalidLanguagePreferenceFormat);
+        }
         self.ensure_ma_mut().language = Some(language);
         Ok(())
     }
@@ -341,16 +455,20 @@ impl Document {
         self.clear_ma_if_empty();
     }
 
-    pub fn set_ma_type(&mut self, kind: impl Into<String>) {
+    pub fn set_ma_type(&mut self, kind: impl Into<String>) -> Result<()> {
         let kind = kind.into().trim().to_string();
         if kind.is_empty() {
             if let Some(ma) = &mut self.ma {
                 ma.kind = None;
             }
             self.clear_ma_if_empty();
-            return;
+            return Ok(());
+        }
+        if !is_valid_ma_type(&kind) {
+            return Err(MaError::InvalidMaType(kind));
         }
         self.ensure_ma_mut().kind = Some(kind);
+        Ok(())
     }
 
     pub fn clear_ma_type(&mut self) {
@@ -524,12 +642,13 @@ impl Document {
         }
 
         let key_len = public_key_bytes.len();
-        let bytes: [u8; 32] = public_key_bytes
-            .try_into()
-            .map_err(|_| MaError::InvalidKeyLength {
-                expected: 32,
-                actual: key_len,
-            })?;
+        let bytes: [u8; 32] =
+            public_key_bytes
+                .try_into()
+                .map_err(|_| MaError::InvalidKeyLength {
+                    expected: 32,
+                    actual: key_len,
+                })?;
 
         VerifyingKey::from_bytes(&bytes).map_err(|_| MaError::Crypto)
     }
@@ -545,10 +664,12 @@ impl Document {
         }
 
         let key_len = public_key_bytes.len();
-        public_key_bytes.try_into().map_err(|_| MaError::InvalidKeyLength {
-            expected: 32,
-            actual: key_len,
-        })
+        public_key_bytes
+            .try_into()
+            .map_err(|_| MaError::InvalidKeyLength {
+                expected: 32,
+                actual: key_len,
+            })
     }
 
     pub fn payload_document(&self) -> Self {
@@ -565,7 +686,11 @@ impl Document {
         Ok(blake3::hash(&self.payload_bytes()?).into())
     }
 
-    pub fn sign(&mut self, signing_key: &SigningKey, verification_method: &VerificationMethod) -> Result<()> {
+    pub fn sign(
+        &mut self,
+        signing_key: &SigningKey,
+        verification_method: &VerificationMethod,
+    ) -> Result<()> {
         if signing_key.public_key_multibase != verification_method.public_key_multibase {
             return Err(MaError::InvalidPublicKeyMultibase);
         }
@@ -582,7 +707,8 @@ impl Document {
         }
 
         let proof_bytes = multibase_decode(&self.proof.proof_value)?;
-        let signature = Signature::from_slice(&proof_bytes).map_err(|_| MaError::InvalidDocumentSignature)?;
+        let signature =
+            Signature::from_slice(&proof_bytes).map_err(|_| MaError::InvalidDocumentSignature)?;
         let public_key = self.assertion_method_public_key()?;
         public_key
             .verify(&self.payload_hash()?, &signature)
@@ -624,23 +750,74 @@ impl Document {
             if language.trim().is_empty() {
                 return Err(MaError::EmptyLanguagePreference);
             }
+            if !is_valid_gnu_language_list(language) {
+                return Err(MaError::InvalidLanguagePreferenceFormat);
+            }
+        }
+
+        if let Some(inbox) = self.ma.as_ref().and_then(|ma| ma.current_inbox.as_ref()) {
+            if !is_valid_inbox_hint(inbox) {
+                return Err(MaError::InvalidMaCurrentInbox(inbox.clone()));
+            }
+        }
+
+        if let Some(world) = self.ma.as_ref().and_then(|ma| ma.world.as_ref()) {
+            if Did::validate(world).is_err() {
+                return Err(MaError::InvalidMaWorld(world.clone()));
+            }
+        }
+
+        if let Some(transports) = self.ma.as_ref().and_then(|ma| ma.transports.as_ref()) {
+            if !transports.is_object() && !transports.is_array() {
+                return Err(MaError::InvalidMaTransports);
+            }
+        }
+
+        if let Some(link) = self.ma.as_ref().and_then(|ma| ma.link.as_ref()) {
+            if !is_valid_ma_link(link) {
+                return Err(MaError::InvalidMaLink(link.clone()));
+            }
+        }
+
+        if let Some(state_cid) = self.ma.as_ref().and_then(|ma| ma.state_cid.as_ref()) {
+            if Cid::try_from(state_cid.as_str()).is_err() {
+                return Err(MaError::InvalidMaStateCid(state_cid.clone()));
+            }
+        }
+
+        if let Some(world_root_cid) = self.ma.as_ref().and_then(|ma| ma.world_root_cid.as_ref()) {
+            if Cid::try_from(world_root_cid.as_str()).is_err() {
+                return Err(MaError::InvalidMaWorldRootCid(world_root_cid.clone()));
+            }
         }
 
         if let Some(created) = self.ma.as_ref().and_then(|ma| ma.created.as_ref()) {
-            if created.trim().is_empty() {
-                return Err(MaError::JsonDecode("ma.created cannot be empty".to_string()));
+            if !is_valid_rfc3339_utc(created) {
+                return Err(MaError::InvalidMaCreated(created.clone()));
+            }
+        }
+
+        if let Some(kind) = self.ma.as_ref().and_then(|ma| ma.kind.as_ref()) {
+            if !is_valid_ma_type(kind) {
+                return Err(MaError::InvalidMaType(kind.clone()));
             }
         }
 
         if let Some(updated) = self.ma.as_ref().and_then(|ma| ma.updated.as_ref()) {
-            if updated.trim().is_empty() {
-                return Err(MaError::JsonDecode("ma.updated cannot be empty".to_string()));
+            if !is_valid_rfc3339_utc(updated) {
+                return Err(MaError::InvalidMaUpdated(updated.clone()));
+            }
+        }
+
+        if let Some(deactivated) = self.ma.as_ref().and_then(|ma| ma.deactivated.as_ref()) {
+            if !is_valid_rfc3339_utc(deactivated) {
+                return Err(MaError::InvalidMaDeactivated(deactivated.clone()));
             }
         }
 
         if let Some(version_id) = self.ma.as_ref().and_then(|ma| ma.version_id.as_ref()) {
-            if version_id.trim().is_empty() {
-                return Err(MaError::JsonDecode("ma.versionId cannot be empty".to_string()));
+            if !is_valid_version_id(version_id) {
+                return Err(MaError::InvalidMaVersionId(version_id.clone()));
             }
         }
 
@@ -649,11 +826,15 @@ impl Document {
         }
 
         if self.assertion_method.is_empty() {
-            return Err(MaError::UnknownVerificationMethod("assertionMethod".to_string()));
+            return Err(MaError::UnknownVerificationMethod(
+                "assertionMethod".to_string(),
+            ));
         }
 
         if self.key_agreement.is_empty() {
-            return Err(MaError::UnknownVerificationMethod("keyAgreement".to_string()));
+            return Err(MaError::UnknownVerificationMethod(
+                "keyAgreement".to_string(),
+            ));
         }
 
         Ok(())
@@ -687,5 +868,74 @@ impl TryFrom<&SigningKey> for VerificationMethod {
             fragment,
             value.public_key_multibase.clone(),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn set_ma_type_accepts_allowed_value() {
+        let root = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr")
+            .expect("valid test did");
+        let mut document = Document::new(&root, &root);
+
+        document
+            .set_ma_type("agent")
+            .expect("agent should be accepted as ma.type");
+        assert_eq!(
+            document
+                .ma
+                .as_ref()
+                .and_then(|ma| ma.kind.as_ref())
+                .map(String::as_str),
+            Some("agent")
+        );
+    }
+
+    #[test]
+    fn set_ma_type_rejects_invalid_values() {
+        let root = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr")
+            .expect("valid test did");
+        let mut document = Document::new(&root, &root);
+
+        let err = document
+            .set_ma_type("bot")
+            .expect_err("bot should be rejected in ma.type");
+
+        match err {
+            MaError::InvalidMaType(value) => assert_eq!(value, "bot"),
+            other => panic!("unexpected error variant: {other}"),
+        }
+
+        let err = document
+            .set_ma_type("bahner")
+            .expect_err("bahner should be rejected in ma.type");
+
+        match err {
+            MaError::InvalidMaType(value) => assert_eq!(value, "bahner"),
+            other => panic!("unexpected error variant: {other}"),
+        }
+    }
+
+    #[test]
+    fn validate_rejects_invalid_existing_ma_type() {
+        let root = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr")
+            .expect("valid test did");
+        let mut document = Document::new(&root, &root);
+        let ma = MaFields {
+            kind: Some("bahner".to_string()),
+            ..Default::default()
+        };
+        document.ma = Some(ma);
+
+        let err = document
+            .validate()
+            .expect_err("validate should reject non-enum ma.type");
+        match err {
+            MaError::InvalidMaType(value) => assert_eq!(value, "bahner"),
+            other => panic!("unexpected error variant: {other}"),
+        }
     }
 }

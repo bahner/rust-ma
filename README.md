@@ -1,4 +1,4 @@
-# did-ma
+# ma-did
 
 A Rust library for DID- and message-oriented identity primitives used by the ma actor stack.
 
@@ -48,7 +48,14 @@ Add as dependency:
 
 ```toml
 [dependencies]
-did-ma = { path = "../rust-ma" }
+ma-did = "0.1"
+```
+
+Local path dependency during development:
+
+```toml
+[dependencies]
+ma-did = { path = "../did" }
 ```
 
 Example flow:
@@ -62,6 +69,5 @@ Example flow:
 ## Notes
 
 - This is a library crate; consumer crates compile it transitively.
-- Direct document formatting should remain inside `did-ma` APIs.
+- Direct document formatting should remain inside `ma-did` APIs.
 - See [ma-spec](../ma-spec/) for the formal DID method specification intended for W3C registration.
-- Direct document formatting should remain inside `did-ma` APIs.

@@ -291,28 +291,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "did-ma"
-version = "0.1.0"
-dependencies = [
- "blake3",
- "chacha20poly1305",
- "ciborium",
- "cid",
- "ed25519-dalek",
- "hex",
- "js-sys",
- "multibase",
- "nanoid",
- "rand_core",
- "regex",
- "serde",
- "serde_json",
- "thiserror",
- "unsigned-varint",
- "x25519-dalek",
-]
-
-[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -427,6 +405,28 @@ name = "libc"
 version = "0.2.183"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5b646652bf6661599e1da8901b3b9522896f01e736bad5f723fe7a3a27f899d"
+
+[[package]]
+name = "ma-did"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "chacha20poly1305",
+ "ciborium",
+ "cid",
+ "ed25519-dalek",
+ "hex",
+ "js-sys",
+ "multibase",
+ "nanoid",
+ "rand_core",
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "unsigned-varint",
+ "x25519-dalek",
+]
 
 [[package]]
 name = "match-lookup"

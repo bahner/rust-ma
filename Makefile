@@ -4,7 +4,7 @@ build:
 	cargo build
 
 clean:
-	cargo clean -p did-ma
+	cargo clean -p ma-did
 
 distclean: clean
 	rm -rf target

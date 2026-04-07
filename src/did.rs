@@ -22,7 +22,10 @@ impl Did {
     pub fn new_root(ipns: impl Into<String>) -> Result<Self> {
         let ipns = ipns.into();
         validate_identifier(&ipns)?;
-        Ok(Self { ipns, fragment: None })
+        Ok(Self {
+            ipns,
+            fragment: None,
+        })
     }
 
     pub fn new_fragment(ipns: impl Into<String>, fragment: impl Into<String>) -> Result<Self> {
@@ -73,7 +76,7 @@ impl Did {
         match parts.as_slice() {
             [] => Err(MaError::MissingIdentifier),
             [_, ..] if parts.len() > 2 => Err(MaError::InvalidDidFormat),
-            [identifier] if identifier.is_empty() => Err(MaError::MissingIdentifier),
+            [""] => Err(MaError::MissingIdentifier),
             [identifier] => {
                 validate_identifier(identifier)?;
                 Ok(((*identifier).to_string(), None))
@@ -126,7 +129,8 @@ fn validate_identifier(input: &str) -> Result<()> {
 static FRAGMENT_RE: OnceLock<Regex> = OnceLock::new();
 
 fn validate_fragment(input: &str) -> Result<()> {
-    let re = FRAGMENT_RE.get_or_init(|| Regex::new(r"^[a-zA-Z0-9_-]+$").expect("fragment regex must compile"));
+    let re = FRAGMENT_RE
+        .get_or_init(|| Regex::new(r"^[a-zA-Z0-9_-]+$").expect("fragment regex must compile"));
     if !re.is_match(input) {
         return Err(MaError::InvalidFragment(input.to_string()));
     }

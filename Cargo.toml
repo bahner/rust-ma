@@ -1,7 +1,15 @@
 [package]
-name = "did-ma"
+name = "ma-did"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+description = "DID and message primitives for the ma actor stack"
+readme = "README.md"
+license = "GPL-3.0-only"
+repository = "https://github.com/bahner/rust-ma"
+homepage = "https://github.com/bahner/rust-ma"
+documentation = "https://docs.rs/ma-did"
+keywords = ["did", "identity", "messaging", "multiformat", "iroh"]
 
 [dependencies]
 blake3 = "1.8"

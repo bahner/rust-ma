@@ -21,7 +21,8 @@ pub fn multicodec_encode(codec: u64, payload: &[u8]) -> Vec<u8> {
 }
 
 pub fn multicodec_decode(encoded: &[u8]) -> Result<(u64, Vec<u8>)> {
-    let (codec, remainder) = decode::u64(encoded).map_err(|_| MaError::InvalidPublicKeyMultibase)?;
+    let (codec, remainder) =
+        decode::u64(encoded).map_err(|_| MaError::InvalidPublicKeyMultibase)?;
     if remainder.is_empty() {
         return Err(MaError::InvalidPublicKeyMultibase);
     }
