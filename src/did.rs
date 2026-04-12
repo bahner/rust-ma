@@ -1,5 +1,6 @@
 use std::sync::OnceLock;
 
+use nanoid::nanoid;
 use regex::Regex;
 
 use crate::error::{MaError, Result};
@@ -19,13 +20,10 @@ impl Did {
         Self::new_fragment(ipns, fragment)
     }
 
+    /// Create a DID with an auto-generated nanoid fragment.
+    /// Use `Did::new(ipns, fragment)` when you want a specific fragment.
     pub fn new_root(ipns: impl Into<String>) -> Result<Self> {
-        let ipns = ipns.into();
-        validate_identifier(&ipns)?;
-        Ok(Self {
-            ipns,
-            fragment: None,
-        })
+        Self::new_fragment(ipns, nanoid!())
     }
 
     pub fn new_fragment(ipns: impl Into<String>, fragment: impl Into<String>) -> Result<Self> {
@@ -43,13 +41,6 @@ impl Did {
 
     pub fn base_id(&self) -> String {
         format!("{DID_PREFIX}{}", self.ipns)
-    }
-
-    pub fn without_fragment(&self) -> Self {
-        Self {
-            ipns: self.ipns.clone(),
-            fragment: None,
-        }
     }
 
     pub fn with_fragment(&self, fragment: impl Into<String>) -> Result<Self> {
@@ -109,7 +100,7 @@ impl TryFrom<&str> for Did {
         let (ipns, fragment) = Self::parse(value)?;
         match fragment {
             Some(fragment) => Self::new_fragment(ipns, fragment),
-            None => Self::new_root(ipns),
+            None => Err(MaError::MissingFragment),
         }
     }
 }

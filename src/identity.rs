@@ -10,8 +10,8 @@ pub struct GeneratedIdentity {
 
 pub fn generate_agent_identity(ipns: &str) -> Result<GeneratedIdentity> {
     let root_did = Did::new_root(ipns)?;
-    let sign_did = Did::new(ipns, "sig")?;
-    let enc_did = Did::new(ipns, "enc")?;
+    let sign_did = Did::new_root(ipns)?;
+    let enc_did = Did::new_root(ipns)?;
 
     let signing_key = SigningKey::generate(sign_did)?;
     let encryption_key = EncryptionKey::generate(enc_did)?;
@@ -22,7 +22,7 @@ pub fn generate_agent_identity(ipns: &str) -> Result<GeneratedIdentity> {
         root_did.base_id(),
         root_did.base_id(),
         signing_key.key_type.clone(),
-        "sig",
+        signing_key.did.fragment.as_deref().unwrap_or_default(),
         signing_key.public_key_multibase.clone(),
     )?;
 
@@ -30,7 +30,7 @@ pub fn generate_agent_identity(ipns: &str) -> Result<GeneratedIdentity> {
         root_did.base_id(),
         root_did.base_id(),
         encryption_key.key_type.clone(),
-        "enc",
+        encryption_key.did.fragment.as_deref().unwrap_or_default(),
         encryption_key.public_key_multibase.clone(),
     )?;
 

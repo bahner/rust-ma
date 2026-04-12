@@ -192,8 +192,8 @@ impl Message {
             return Err(MaError::MissingSignature);
         }
 
-        let sender_root = Did::try_from(self.from.as_str())?.without_fragment().id();
-        if sender_document.id != sender_root {
+        let sender_did = Did::try_from(self.from.as_str())?;
+        if sender_document.id != sender_did.id() {
             return Err(MaError::InvalidRecipient);
         }
 
@@ -528,15 +528,15 @@ mod tests {
         Document,
     ) {
         let sender_did = Did::new_root("k51sender").expect("sender did");
-        let sender_sign_did = Did::new("k51sender", "sig").expect("sender sign did");
-        let sender_enc_did = Did::new("k51sender", "enc").expect("sender enc did");
+        let sender_sign_did = Did::new_root("k51sender").expect("sender sign did");
+        let sender_enc_did = Did::new_root("k51sender").expect("sender enc did");
         let sender_signing = SigningKey::generate(sender_sign_did).expect("sender signing key");
         let sender_encryption =
             EncryptionKey::generate(sender_enc_did).expect("sender encryption key");
 
         let recipient_did = Did::new_root("k51recipient").expect("recipient did");
-        let recipient_sign_did = Did::new("k51recipient", "sig").expect("recipient sign did");
-        let recipient_enc_did = Did::new("k51recipient", "enc").expect("recipient enc did");
+        let recipient_sign_did = Did::new_root("k51recipient").expect("recipient sign did");
+        let recipient_enc_did = Did::new_root("k51recipient").expect("recipient enc did");
         let recipient_signing =
             SigningKey::generate(recipient_sign_did).expect("recipient signing key");
         let recipient_encryption =
@@ -547,7 +547,7 @@ mod tests {
             sender_did.id(),
             sender_did.id(),
             sender_signing.key_type.clone(),
-            "sig",
+            sender_signing.did.fragment.as_deref().unwrap_or_default(),
             sender_signing.public_key_multibase.clone(),
         )
         .expect("sender assertion vm");
@@ -555,7 +555,7 @@ mod tests {
             sender_did.id(),
             sender_did.id(),
             sender_encryption.key_type.clone(),
-            "enc",
+            sender_encryption.did.fragment.as_deref().unwrap_or_default(),
             sender_encryption.public_key_multibase.clone(),
         )
         .expect("sender key agreement vm");
@@ -576,7 +576,7 @@ mod tests {
             recipient_did.id(),
             recipient_did.id(),
             recipient_signing.key_type.clone(),
-            "sig",
+            recipient_signing.did.fragment.as_deref().unwrap_or_default(),
             recipient_signing.public_key_multibase.clone(),
         )
         .expect("recipient assertion vm");
@@ -584,7 +584,7 @@ mod tests {
             recipient_did.id(),
             recipient_did.id(),
             recipient_encryption.key_type.clone(),
-            "enc",
+            recipient_encryption.did.fragment.as_deref().unwrap_or_default(),
             recipient_encryption.public_key_multibase.clone(),
         )
         .expect("recipient key agreement vm");
