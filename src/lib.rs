@@ -12,7 +12,7 @@ mod multiformat;
 pub use did::{DID_PREFIX, Did};
 pub use doc::{
     DEFAULT_DID_CONTEXT, DEFAULT_PROOF_PURPOSE, DEFAULT_PROOF_TYPE, Document, Proof,
-    VerificationMethod,
+    VerificationMethod, now_iso_utc,
 };
 pub use error::{MaError, Result};
 pub use identity::{GeneratedIdentity, generate_agent_identity};

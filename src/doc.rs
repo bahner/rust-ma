@@ -1,6 +1,8 @@
 use cid::Cid;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
     did::Did,
@@ -12,6 +14,51 @@ use crate::{
 pub const DEFAULT_DID_CONTEXT: &[&str] = &["https://w3id.org/did/v1"];
 pub const DEFAULT_PROOF_TYPE: &str = "MultiformatSignature2023";
 pub const DEFAULT_PROOF_PURPOSE: &str = "assertionMethod";
+
+/// Returns the current UTC time as an ISO 8601 string with millisecond precision.
+pub fn now_iso_utc() -> String {
+    #[cfg(target_arch = "wasm32")]
+    {
+        return js_sys::Date::new_0()
+            .to_iso_string()
+            .as_string()
+            .unwrap_or_else(|| "1970-01-01T00:00:00.000Z".to_string());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let duration = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default();
+        unix_millis_to_iso(duration.as_secs(), duration.subsec_millis())
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn unix_millis_to_iso(secs: u64, millis: u32) -> String {
+    // Howard Hinnant's civil_from_days algorithm.
+    let z = (secs / 86400) as i64 + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    let tod = secs % 86400;
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
+        y,
+        m,
+        d,
+        tod / 3600,
+        (tod % 3600) / 60,
+        tod % 60,
+        millis,
+    )
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerificationMethod {
@@ -136,14 +183,10 @@ pub struct MaFields {
     pub state_cid: Option<String>,
     #[serde(rename = "worldRootCid", skip_serializing_if = "Option::is_none")]
     pub world_root_cid: Option<String>,
-    #[serde(rename = "created", skip_serializing_if = "Option::is_none")]
-    pub created: Option<String>,
-    #[serde(rename = "updated", skip_serializing_if = "Option::is_none")]
-    pub updated: Option<String>,
     #[serde(rename = "deactivated", skip_serializing_if = "Option::is_none")]
     pub deactivated: Option<String>,
-    #[serde(rename = "versionId", skip_serializing_if = "Option::is_none")]
-    pub version_id: Option<String>,
+    #[serde(rename = "version", skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
 }
 
 impl MaFields {
@@ -159,10 +202,8 @@ impl MaFields {
             && self.link.is_none()
             && self.state_cid.is_none()
             && self.world_root_cid.is_none()
-            && self.created.is_none()
-            && self.updated.is_none()
             && self.deactivated.is_none()
-            && self.version_id.is_none()
+            && self.version.is_none()
     }
 }
 
@@ -286,12 +327,17 @@ pub struct Document {
     pub proof: Proof,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identity: Option<String>,
+    #[serde(rename = "createdAt", skip_serializing_if = "Option::is_none")]
+    pub created: Option<String>,
+    #[serde(rename = "updatedAt", skip_serializing_if = "Option::is_none")]
+    pub updated: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ma: Option<MaFields>,
 }
 
 impl Document {
     pub fn new(identity: &Did, controller: &Did) -> Self {
+        let now = now_iso_utc();
         Self {
             context: DEFAULT_DID_CONTEXT
                 .iter()
@@ -304,6 +350,8 @@ impl Document {
             key_agreement: String::new(),
             proof: Proof::default(),
             identity: None,
+            created: Some(now.clone()),
+            updated: Some(now),
             ma: None,
         }
     }
@@ -569,28 +617,22 @@ impl Document {
         self.clear_ma_if_empty();
     }
 
-    pub fn set_ma_created(&mut self, created: impl Into<String>) {
+    pub fn set_created(&mut self, created: impl Into<String>) {
         let value = created.into().trim().to_string();
         if value.is_empty() {
-            if let Some(ma) = &mut self.ma {
-                ma.created = None;
-            }
-            self.clear_ma_if_empty();
+            self.created = None;
             return;
         }
-        self.ensure_ma_mut().created = Some(value);
+        self.created = Some(value);
     }
 
-    pub fn set_ma_updated(&mut self, updated: impl Into<String>) {
+    pub fn set_updated(&mut self, updated: impl Into<String>) {
         let value = updated.into().trim().to_string();
         if value.is_empty() {
-            if let Some(ma) = &mut self.ma {
-                ma.updated = None;
-            }
-            self.clear_ma_if_empty();
+            self.updated = None;
             return;
         }
-        self.ensure_ma_mut().updated = Some(value);
+        self.updated = Some(value);
     }
 
     pub fn set_ma_deactivated(&mut self, deactivated: impl Into<String>) {
@@ -612,16 +654,16 @@ impl Document {
         self.clear_ma_if_empty();
     }
 
-    pub fn set_ma_version_id(&mut self, version_id: impl Into<String>) {
-        let value = version_id.into().trim().to_string();
+    pub fn set_ma_version(&mut self, version: impl Into<String>) {
+        let value = version.into().trim().to_string();
         if value.is_empty() {
             if let Some(ma) = &mut self.ma {
-                ma.version_id = None;
+                ma.version = None;
             }
             self.clear_ma_if_empty();
             return;
         }
-        self.ensure_ma_mut().version_id = Some(value);
+        self.ensure_ma_mut().version = Some(value);
     }
 
     pub fn assertion_method_public_key(&self) -> Result<VerifyingKey> {
@@ -784,7 +826,7 @@ impl Document {
             }
         }
 
-        if let Some(created) = self.ma.as_ref().and_then(|ma| ma.created.as_ref()) {
+        if let Some(created) = &self.created {
             if !is_valid_rfc3339_utc(created) {
                 return Err(MaError::InvalidMaCreated(created.clone()));
             }
@@ -792,7 +834,7 @@ impl Document {
 
         // ma.type is application-defined; did-ma places no restrictions on its value.
 
-        if let Some(updated) = self.ma.as_ref().and_then(|ma| ma.updated.as_ref()) {
+        if let Some(updated) = &self.updated {
             if !is_valid_rfc3339_utc(updated) {
                 return Err(MaError::InvalidMaUpdated(updated.clone()));
             }
@@ -804,9 +846,9 @@ impl Document {
             }
         }
 
-        if let Some(version_id) = self.ma.as_ref().and_then(|ma| ma.version_id.as_ref()) {
-            if !is_valid_version_id(version_id) {
-                return Err(MaError::InvalidMaVersionId(version_id.clone()));
+        if let Some(version) = self.ma.as_ref().and_then(|ma| ma.version.as_ref()) {
+            if !is_valid_version_id(version) {
+                return Err(MaError::InvalidMaVersionId(version.clone()));
             }
         }
 

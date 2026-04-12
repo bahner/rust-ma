@@ -88,13 +88,13 @@ pub enum MaError {
     InvalidMaStateCid(String),
     #[error("invalid ma.worldRootCid: {0}")]
     InvalidMaWorldRootCid(String),
-    #[error("invalid ma.created timestamp: {0}")]
+    #[error("invalid createdAt timestamp: {0}")]
     InvalidMaCreated(String),
-    #[error("invalid ma.updated timestamp: {0}")]
+    #[error("invalid updatedAt timestamp: {0}")]
     InvalidMaUpdated(String),
     #[error("invalid ma.deactivated timestamp: {0}")]
     InvalidMaDeactivated(String),
-    #[error("invalid ma.versionId: {0}")]
+    #[error("invalid ma.version: {0}")]
     InvalidMaVersionId(String),
     #[error("identity CID is invalid")]
     InvalidIdentity,
