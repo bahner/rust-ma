@@ -191,10 +191,6 @@ fn is_valid_gnu_language_list(value: &str) -> bool {
     saw_any
 }
 
-fn is_valid_ma_type(value: &str) -> bool {
-    matches!(value, "avatar" | "agent" | "world" | "room" | "object")
-}
-
 fn is_hex_64(value: &str) -> bool {
     value.len() == 64 && value.chars().all(|ch| ch.is_ascii_hexdigit())
 }
@@ -463,9 +459,6 @@ impl Document {
             }
             self.clear_ma_if_empty();
             return Ok(());
-        }
-        if !is_valid_ma_type(&kind) {
-            return Err(MaError::InvalidMaType(kind));
         }
         self.ensure_ma_mut().kind = Some(kind);
         Ok(())
@@ -797,11 +790,7 @@ impl Document {
             }
         }
 
-        if let Some(kind) = self.ma.as_ref().and_then(|ma| ma.kind.as_ref()) {
-            if !is_valid_ma_type(kind) {
-                return Err(MaError::InvalidMaType(kind.clone()));
-            }
-        }
+        // ma.type is application-defined; did-ma places no restrictions on its value.
 
         if let Some(updated) = self.ma.as_ref().and_then(|ma| ma.updated.as_ref()) {
             if !is_valid_rfc3339_utc(updated) {
@@ -895,47 +884,38 @@ mod tests {
     }
 
     #[test]
-    fn set_ma_type_rejects_invalid_values() {
+    fn set_ma_type_accepts_any_value() {
         let root = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr")
             .expect("valid test did");
         let mut document = Document::new(&root, &root);
 
-        let err = document
+        document
+            .set_ma_type("cell")
+            .expect("cell should be accepted as ma.type");
+        assert_eq!(
+            document.ma.as_ref().and_then(|ma| ma.kind.as_ref()).map(String::as_str),
+            Some("cell")
+        );
+
+        document
             .set_ma_type("bot")
-            .expect_err("bot should be rejected in ma.type");
-
-        match err {
-            MaError::InvalidMaType(value) => assert_eq!(value, "bot"),
-            other => panic!("unexpected error variant: {other}"),
-        }
-
-        let err = document
-            .set_ma_type("bahner")
-            .expect_err("bahner should be rejected in ma.type");
-
-        match err {
-            MaError::InvalidMaType(value) => assert_eq!(value, "bahner"),
-            other => panic!("unexpected error variant: {other}"),
-        }
+            .expect("bot should be accepted as ma.type");
+        assert_eq!(
+            document.ma.as_ref().and_then(|ma| ma.kind.as_ref()).map(String::as_str),
+            Some("bot")
+        );
     }
 
     #[test]
-    fn validate_rejects_invalid_existing_ma_type() {
-        let root = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr")
-            .expect("valid test did");
-        let mut document = Document::new(&root, &root);
-        let ma = MaFields {
-            kind: Some("bahner".to_string()),
-            ..Default::default()
-        };
-        document.ma = Some(ma);
-
-        let err = document
+    fn validate_accepts_arbitrary_ma_type() {
+        let identity = crate::identity::generate_agent_identity(
+            "k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr",
+        )
+        .expect("generate identity");
+        let mut document = identity.document;
+        document.set_ma_type("bahner").expect("set_ma_type");
+        document
             .validate()
-            .expect_err("validate should reject non-enum ma.type");
-        match err {
-            MaError::InvalidMaType(value) => assert_eq!(value, "bahner"),
-            other => panic!("unexpected error variant: {other}"),
-        }
+            .expect("validate should accept any ma.type value");
     }
 }

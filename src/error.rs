@@ -76,8 +76,6 @@ pub enum MaError {
     EmptyLanguagePreference,
     #[error("language preference must follow GNU LANGUAGE format (colon-separated language list)")]
     InvalidLanguagePreferenceFormat,
-    #[error("invalid ma.type value: {0}. allowed values: avatar, agent, world, room, object")]
-    InvalidMaType(String),
     #[error("invalid ma.world DID: {0}")]
     InvalidMaWorld(String),
     #[error("invalid ma.currentInbox value: {0}")]
