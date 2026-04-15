@@ -8,8 +8,8 @@ use crate::{
     multiformat::{public_key_multibase_decode, public_key_multibase_encode},
 };
 
-pub const ASSERTION_METHOD_KEY_TYPE: &str = "MultiKey";
-pub const KEY_AGREEMENT_KEY_TYPE: &str = "MultiKey";
+pub const ASSERTION_METHOD_KEY_TYPE: &str = "Multikey";
+pub const KEY_AGREEMENT_KEY_TYPE: &str = "Multikey";
 
 // https://github.com/multiformats/multicodec/blob/master/table.csv
 pub const X25519_PUB_CODEC: u64 = 0xec;

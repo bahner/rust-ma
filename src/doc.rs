@@ -11,7 +11,7 @@ use crate::{
     multiformat::{public_key_multibase_decode, signature_multibase_decode, signature_multibase_encode},
 };
 
-pub const DEFAULT_DID_CONTEXT: &[&str] = &["https://www.w3.org/ns/did/v1"];
+pub const DEFAULT_DID_CONTEXT: &[&str] = &["https://www.w3.org/ns/did/v1.1"];
 pub const DEFAULT_PROOF_TYPE: &str = "MultiformatSignature2023";
 pub const DEFAULT_PROOF_PURPOSE: &str = "assertionMethod";
 
