@@ -193,7 +193,7 @@ impl Message {
         }
 
         let sender_did = Did::try_from(self.from.as_str())?;
-        if sender_document.id != sender_did.id() {
+        if sender_document.id != sender_did.base_id() {
             return Err(MaError::InvalidRecipient);
         }
 
@@ -544,16 +544,16 @@ mod tests {
 
         let mut sender_document = Document::new(&sender_did, &sender_did);
         let sender_assertion = VerificationMethod::new(
-            sender_did.id(),
-            sender_did.id(),
+            sender_did.base_id(),
+            sender_did.base_id(),
             sender_signing.key_type.clone(),
             sender_signing.did.fragment.as_deref().unwrap_or_default(),
             sender_signing.public_key_multibase.clone(),
         )
         .expect("sender assertion vm");
         let sender_key_agreement = VerificationMethod::new(
-            sender_did.id(),
-            sender_did.id(),
+            sender_did.base_id(),
+            sender_did.base_id(),
             sender_encryption.key_type.clone(),
             sender_encryption.did.fragment.as_deref().unwrap_or_default(),
             sender_encryption.public_key_multibase.clone(),
@@ -565,24 +565,24 @@ mod tests {
         sender_document
             .add_verification_method(sender_key_agreement.clone())
             .expect("add sender key agreement");
-        sender_document.assertion_method = sender_assertion.id.clone();
-        sender_document.key_agreement = sender_key_agreement.id.clone();
+        sender_document.assertion_method = vec![sender_assertion.id.clone()];
+        sender_document.key_agreement = vec![sender_key_agreement.id.clone()];
         sender_document
             .sign(&sender_signing, &sender_assertion)
             .expect("sign sender doc");
 
         let mut recipient_document = Document::new(&recipient_did, &recipient_did);
         let recipient_assertion = VerificationMethod::new(
-            recipient_did.id(),
-            recipient_did.id(),
+            recipient_did.base_id(),
+            recipient_did.base_id(),
             recipient_signing.key_type.clone(),
             recipient_signing.did.fragment.as_deref().unwrap_or_default(),
             recipient_signing.public_key_multibase.clone(),
         )
         .expect("recipient assertion vm");
         let recipient_key_agreement = VerificationMethod::new(
-            recipient_did.id(),
-            recipient_did.id(),
+            recipient_did.base_id(),
+            recipient_did.base_id(),
             recipient_encryption.key_type.clone(),
             recipient_encryption.did.fragment.as_deref().unwrap_or_default(),
             recipient_encryption.public_key_multibase.clone(),
@@ -594,8 +594,8 @@ mod tests {
         recipient_document
             .add_verification_method(recipient_key_agreement.clone())
             .expect("add recipient key agreement");
-        recipient_document.assertion_method = recipient_assertion.id.clone();
-        recipient_document.key_agreement = recipient_key_agreement.id.clone();
+        recipient_document.assertion_method = vec![recipient_assertion.id.clone()];
+        recipient_document.key_agreement = vec![recipient_key_agreement.id.clone()];
         recipient_document
             .sign(&recipient_signing, &recipient_assertion)
             .expect("sign recipient doc");

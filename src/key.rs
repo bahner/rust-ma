@@ -14,6 +14,7 @@ pub const KEY_AGREEMENT_KEY_TYPE: &str = "MultiKey";
 // https://github.com/multiformats/multicodec/blob/master/table.csv
 pub const X25519_PUB_CODEC: u64 = 0xec;
 pub const ED25519_PUB_CODEC: u64 = 0xed;
+pub const EDDSA_SIG_CODEC: u64 = 0xd0ed;
 
 #[derive(Clone)]
 pub struct SigningKey {

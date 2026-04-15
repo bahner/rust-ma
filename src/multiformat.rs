@@ -37,3 +37,12 @@ pub fn public_key_multibase_decode(input: &str) -> Result<(u64, Vec<u8>)> {
     let decoded = multibase_decode(input)?;
     multicodec_decode(&decoded)
 }
+
+pub fn signature_multibase_encode(codec: u64, signature: &[u8]) -> Result<String> {
+    multibase_encode(&multicodec_encode(codec, signature))
+}
+
+pub fn signature_multibase_decode(input: &str) -> Result<(u64, Vec<u8>)> {
+    let decoded = multibase_decode(input)?;
+    multicodec_decode(&decoded)
+}

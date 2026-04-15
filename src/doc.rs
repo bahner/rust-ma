@@ -7,11 +7,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::{
     did::Did,
     error::{MaError, Result},
-    key::{ED25519_PUB_CODEC, EncryptionKey, SigningKey, X25519_PUB_CODEC},
-    multiformat::{multibase_decode, multibase_encode, public_key_multibase_decode},
+    key::{ED25519_PUB_CODEC, EDDSA_SIG_CODEC, EncryptionKey, SigningKey, X25519_PUB_CODEC},
+    multiformat::{public_key_multibase_decode, signature_multibase_decode, signature_multibase_encode},
 };
 
-pub const DEFAULT_DID_CONTEXT: &[&str] = &["https://w3id.org/did/v1"];
+pub const DEFAULT_DID_CONTEXT: &[&str] = &["https://www.w3.org/ns/did/v1"];
 pub const DEFAULT_PROOF_TYPE: &str = "MultiformatSignature2023";
 pub const DEFAULT_PROOF_PURPOSE: &str = "assertionMethod";
 
@@ -65,7 +65,7 @@ pub struct VerificationMethod {
     pub id: String,
     #[serde(rename = "type")]
     pub key_type: String,
-    pub controller: Vec<String>,
+    pub controller: String,
     #[serde(rename = "publicKeyMultibase")]
     pub public_key_multibase: String,
 }
@@ -87,7 +87,7 @@ impl VerificationMethod {
         let method = Self {
             id: format!("{base_id}#{}", fragment.as_ref()),
             key_type: key_type.into(),
-            controller: vec![controller.into()],
+            controller: controller.into(),
             public_key_multibase: public_key_multibase.into(),
         };
         method.validate()?;
@@ -97,15 +97,6 @@ impl VerificationMethod {
     pub fn fragment(&self) -> Result<String> {
         let did = Did::try_from(self.id.as_str())?;
         did.fragment.ok_or(MaError::MissingFragment)
-    }
-
-    pub fn add_controller(&mut self, controller: impl Into<String>) -> Result<()> {
-        let controller = controller.into();
-        Did::validate(&controller)?;
-        if !self.controller.contains(&controller) {
-            self.controller.push(controller);
-        }
-        Ok(())
     }
 
     pub fn validate(&self) -> Result<()> {
@@ -119,9 +110,7 @@ impl VerificationMethod {
             return Err(MaError::EmptyController);
         }
 
-        for controller in &self.controller {
-            Did::validate(controller)?;
-        }
+        Did::validate(&self.controller)?;
 
         if self.public_key_multibase.is_empty() {
             return Err(MaError::EmptyPublicKeyMultibase);
@@ -161,8 +150,6 @@ impl Proof {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MaFields {
-    #[serde(rename = "/", skip_serializing_if = "Option::is_none")]
-    pub link: Option<String>,
     #[serde(rename = "presenceHint", skip_serializing_if = "Option::is_none")]
     pub presence_hint: Option<String>,
     #[serde(rename = "currentInbox", skip_serializing_if = "Option::is_none")]
@@ -174,19 +161,19 @@ pub struct MaFields {
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub kind: Option<String>,
     #[serde(rename = "world", skip_serializing_if = "Option::is_none")]
-    pub world: Option<String>,
+    pub world: Option<serde_json::Value>,
     #[serde(rename = "requestedTTL", skip_serializing_if = "Option::is_none")]
     pub requested_ttl: Option<u64>,
     #[serde(rename = "transports", skip_serializing_if = "Option::is_none")]
     pub transports: Option<serde_json::Value>,
     #[serde(rename = "stateCid", skip_serializing_if = "Option::is_none")]
     pub state_cid: Option<String>,
-    #[serde(rename = "worldRootCid", skip_serializing_if = "Option::is_none")]
-    pub world_root_cid: Option<String>,
     #[serde(rename = "deactivated", skip_serializing_if = "Option::is_none")]
     pub deactivated: Option<String>,
     #[serde(rename = "version", skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    #[serde(rename = "pingIntervalSecs", skip_serializing_if = "Option::is_none")]
+    pub ping_interval_secs: Option<u32>,
 }
 
 impl MaFields {
@@ -199,11 +186,10 @@ impl MaFields {
             && self.world.is_none()
             && self.requested_ttl.is_none()
             && self.transports.is_none()
-            && self.link.is_none()
             && self.state_cid.is_none()
-            && self.world_root_cid.is_none()
             && self.deactivated.is_none()
             && self.version.is_none()
+            && self.ping_interval_secs.is_none()
     }
 }
 
@@ -246,17 +232,6 @@ fn is_valid_inbox_hint(value: &str) -> bool {
             let endpoint = rest.split('/').next().unwrap_or_default();
             return is_hex_64(endpoint);
         }
-    }
-    false
-}
-
-fn is_valid_ma_link(value: &str) -> bool {
-    let trimmed = value.trim();
-    if let Some(ipfs) = trimmed.strip_prefix("/ipfs/") {
-        return Cid::try_from(ipfs).is_ok();
-    }
-    if let Some(ipns) = trimmed.strip_prefix("/ipns/") {
-        return !ipns.trim().is_empty() && !ipns.contains(char::is_whitespace);
     }
     false
 }
@@ -321,9 +296,9 @@ pub struct Document {
     #[serde(rename = "verificationMethod")]
     pub verification_method: Vec<VerificationMethod>,
     #[serde(rename = "assertionMethod")]
-    pub assertion_method: String,
+    pub assertion_method: Vec<String>,
     #[serde(rename = "keyAgreement")]
-    pub key_agreement: String,
+    pub key_agreement: Vec<String>,
     pub proof: Proof,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identity: Option<String>,
@@ -343,11 +318,11 @@ impl Document {
                 .iter()
                 .map(|value| (*value).to_string())
                 .collect(),
-            id: identity.id(),
-            controller: vec![controller.id()],
+            id: identity.base_id(),
+            controller: vec![controller.base_id()],
             verification_method: Vec::new(),
-            assertion_method: String::new(),
-            key_agreement: String::new(),
+            assertion_method: Vec::new(),
+            key_agreement: Vec::new(),
             proof: Proof::default(),
             identity: None,
             created: Some(now.clone()),
@@ -519,16 +494,15 @@ impl Document {
         self.clear_ma_if_empty();
     }
 
-    pub fn set_ma_world(&mut self, world_did: impl Into<String>) {
-        let world_did = world_did.into().trim().to_string();
-        if world_did.is_empty() {
+    pub fn set_ma_world(&mut self, world: serde_json::Value) {
+        if world.is_null() {
             if let Some(ma) = &mut self.ma {
                 ma.world = None;
             }
             self.clear_ma_if_empty();
             return;
         }
-        self.ensure_ma_mut().world = Some(world_did);
+        self.ensure_ma_mut().world = Some(world);
     }
 
     pub fn clear_ma_world(&mut self) {
@@ -560,25 +534,6 @@ impl Document {
         self.clear_ma_if_empty();
     }
 
-    pub fn set_ma_link(&mut self, link: impl Into<String>) {
-        let value = link.into().trim().to_string();
-        if value.is_empty() {
-            if let Some(ma) = &mut self.ma {
-                ma.link = None;
-            }
-            self.clear_ma_if_empty();
-            return;
-        }
-        self.ensure_ma_mut().link = Some(value);
-    }
-
-    pub fn clear_ma_link(&mut self) {
-        if let Some(ma) = &mut self.ma {
-            ma.link = None;
-        }
-        self.clear_ma_if_empty();
-    }
-
     pub fn set_ma_state_cid(&mut self, cid: impl Into<String>) {
         let value = cid.into().trim().to_string();
         if value.is_empty() {
@@ -594,25 +549,6 @@ impl Document {
     pub fn clear_ma_state_cid(&mut self) {
         if let Some(ma) = &mut self.ma {
             ma.state_cid = None;
-        }
-        self.clear_ma_if_empty();
-    }
-
-    pub fn set_ma_world_root_cid(&mut self, cid: impl Into<String>) {
-        let value = cid.into().trim().to_string();
-        if value.is_empty() {
-            if let Some(ma) = &mut self.ma {
-                ma.world_root_cid = None;
-            }
-            self.clear_ma_if_empty();
-            return;
-        }
-        self.ensure_ma_mut().world_root_cid = Some(value);
-    }
-
-    pub fn clear_ma_world_root_cid(&mut self) {
-        if let Some(ma) = &mut self.ma {
-            ma.world_root_cid = None;
         }
         self.clear_ma_if_empty();
     }
@@ -654,6 +590,17 @@ impl Document {
         self.clear_ma_if_empty();
     }
 
+    pub fn set_ma_ping_interval_secs(&mut self, secs: u32) {
+        self.ensure_ma_mut().ping_interval_secs = Some(secs);
+    }
+
+    pub fn clear_ma_ping_interval_secs(&mut self) {
+        if let Some(ma) = &mut self.ma {
+            ma.ping_interval_secs = None;
+        }
+        self.clear_ma_if_empty();
+    }
+
     pub fn set_ma_version(&mut self, version: impl Into<String>) {
         let value = version.into().trim().to_string();
         if value.is_empty() {
@@ -667,7 +614,9 @@ impl Document {
     }
 
     pub fn assertion_method_public_key(&self) -> Result<VerifyingKey> {
-        let vm = self.get_verification_method_by_id(&self.assertion_method)?;
+        let assertion_id = self.assertion_method.first()
+            .ok_or_else(|| MaError::UnknownVerificationMethod("assertionMethod".to_string()))?;
+        let vm = self.get_verification_method_by_id(assertion_id)?;
         let (codec, public_key_bytes) = public_key_multibase_decode(&vm.public_key_multibase)?;
         if codec != ED25519_PUB_CODEC {
             return Err(MaError::InvalidMulticodec {
@@ -689,7 +638,9 @@ impl Document {
     }
 
     pub fn key_agreement_public_key_bytes(&self) -> Result<[u8; 32]> {
-        let vm = self.get_verification_method_by_id(&self.key_agreement)?;
+        let agreement_id = self.key_agreement.first()
+            .ok_or_else(|| MaError::UnknownVerificationMethod("keyAgreement".to_string()))?;
+        let vm = self.get_verification_method_by_id(agreement_id)?;
         let (codec, public_key_bytes) = public_key_multibase_decode(&vm.public_key_multibase)?;
         if codec != X25519_PUB_CODEC {
             return Err(MaError::InvalidMulticodec {
@@ -731,7 +682,7 @@ impl Document {
         }
 
         let signature = signing_key.sign(&self.payload_hash()?);
-        let proof_value = multibase_encode(&signature)?;
+        let proof_value = signature_multibase_encode(EDDSA_SIG_CODEC, &signature)?;
         self.proof = Proof::new(proof_value, verification_method.id.clone());
         Ok(())
     }
@@ -741,9 +692,12 @@ impl Document {
             return Err(MaError::MissingProof);
         }
 
-        let proof_bytes = multibase_decode(&self.proof.proof_value)?;
+        let (codec, sig_bytes) = signature_multibase_decode(&self.proof.proof_value)?;
+        if codec != EDDSA_SIG_CODEC {
+            return Err(MaError::InvalidDocumentSignature);
+        }
         let signature =
-            Signature::from_slice(&proof_bytes).map_err(|_| MaError::InvalidDocumentSignature)?;
+            Signature::from_slice(&sig_bytes).map_err(|_| MaError::InvalidDocumentSignature)?;
         let public_key = self.assertion_method_public_key()?;
         public_key
             .verify(&self.payload_hash()?, &signature)
@@ -797,8 +751,27 @@ impl Document {
         }
 
         if let Some(world) = self.ma.as_ref().and_then(|ma| ma.world.as_ref()) {
-            if Did::validate(world).is_err() {
-                return Err(MaError::InvalidMaWorld(world.clone()));
+            // Accept either a DID string or an IPLD link object { "/": "<cid>" }
+            match world {
+                serde_json::Value::String(s) => {
+                    if Did::validate(s).is_err() {
+                        return Err(MaError::InvalidMaWorld(s.clone()));
+                    }
+                }
+                serde_json::Value::Object(obj) => {
+                    if obj.len() != 1 || !obj.contains_key("/") {
+                        return Err(MaError::InvalidMaWorld(world.to_string()));
+                    }
+                    let cid_val = &obj["/"];
+                    if let Some(cid_str) = cid_val.as_str() {
+                        if Cid::try_from(cid_str).is_err() {
+                            return Err(MaError::InvalidMaWorld(cid_str.to_string()));
+                        }
+                    } else {
+                        return Err(MaError::InvalidMaWorld(world.to_string()));
+                    }
+                }
+                _ => return Err(MaError::InvalidMaWorld(world.to_string())),
             }
         }
 
@@ -808,21 +781,9 @@ impl Document {
             }
         }
 
-        if let Some(link) = self.ma.as_ref().and_then(|ma| ma.link.as_ref()) {
-            if !is_valid_ma_link(link) {
-                return Err(MaError::InvalidMaLink(link.clone()));
-            }
-        }
-
         if let Some(state_cid) = self.ma.as_ref().and_then(|ma| ma.state_cid.as_ref()) {
             if Cid::try_from(state_cid.as_str()).is_err() {
                 return Err(MaError::InvalidMaStateCid(state_cid.clone()));
-            }
-        }
-
-        if let Some(world_root_cid) = self.ma.as_ref().and_then(|ma| ma.world_root_cid.as_ref()) {
-            if Cid::try_from(world_root_cid.as_str()).is_err() {
-                return Err(MaError::InvalidMaWorldRootCid(world_root_cid.clone()));
             }
         }
 

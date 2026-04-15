@@ -12,6 +12,8 @@ pub enum MaError {
     MissingIdentifier,
     #[error("missing DID fragment")]
     MissingFragment,
+    #[error("unexpected DID fragment")]
+    UnexpectedFragment,
     #[error("invalid DID format")]
     InvalidDidFormat,
     #[error("invalid DID fragment: {0}")]
@@ -82,12 +84,8 @@ pub enum MaError {
     InvalidMaCurrentInbox(String),
     #[error("invalid ma.transports value: expected object or array")]
     InvalidMaTransports,
-    #[error("invalid ma.link value: {0}")]
-    InvalidMaLink(String),
     #[error("invalid ma.stateCid: {0}")]
     InvalidMaStateCid(String),
-    #[error("invalid ma.worldRootCid: {0}")]
-    InvalidMaWorldRootCid(String),
     #[error("invalid createdAt timestamp: {0}")]
     InvalidMaCreated(String),
     #[error("invalid updatedAt timestamp: {0}")]
