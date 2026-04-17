@@ -148,94 +148,6 @@ impl Proof {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MaFields {
-    #[serde(rename = "presenceHint", skip_serializing_if = "Option::is_none")]
-    pub presence_hint: Option<String>,
-    #[serde(rename = "currentInbox", skip_serializing_if = "Option::is_none")]
-    pub current_inbox: Option<String>,
-    #[serde(rename = "lang", skip_serializing_if = "Option::is_none")]
-    pub lang: Option<String>,
-    #[serde(rename = "language", skip_serializing_if = "Option::is_none")]
-    pub language: Option<String>,
-    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    pub kind: Option<String>,
-    #[serde(rename = "world", skip_serializing_if = "Option::is_none")]
-    pub world: Option<serde_json::Value>,
-    #[serde(rename = "requestedTTL", skip_serializing_if = "Option::is_none")]
-    pub requested_ttl: Option<u64>,
-    #[serde(rename = "transports", skip_serializing_if = "Option::is_none")]
-    pub transports: Option<serde_json::Value>,
-    #[serde(rename = "stateCid", skip_serializing_if = "Option::is_none")]
-    pub state_cid: Option<String>,
-    #[serde(rename = "deactivated", skip_serializing_if = "Option::is_none")]
-    pub deactivated: Option<String>,
-    #[serde(rename = "version", skip_serializing_if = "Option::is_none")]
-    pub version: Option<String>,
-    #[serde(rename = "pingIntervalSecs", skip_serializing_if = "Option::is_none")]
-    pub ping_interval_secs: Option<u32>,
-}
-
-impl MaFields {
-    fn is_empty(&self) -> bool {
-        self.presence_hint.is_none()
-            && self.current_inbox.is_none()
-            && self.lang.is_none()
-            && self.language.is_none()
-            && self.kind.is_none()
-            && self.world.is_none()
-            && self.requested_ttl.is_none()
-            && self.transports.is_none()
-            && self.state_cid.is_none()
-            && self.deactivated.is_none()
-            && self.version.is_none()
-            && self.ping_interval_secs.is_none()
-    }
-}
-
-fn is_valid_gnu_language_token(token: &str) -> bool {
-    if token.eq_ignore_ascii_case("c") || token.eq_ignore_ascii_case("posix") {
-        return true;
-    }
-    !token.is_empty()
-        && token
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | '@'))
-}
-
-fn is_valid_gnu_language_list(value: &str) -> bool {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return false;
-    }
-    let mut saw_any = false;
-    for token in trimmed.split(':').map(str::trim) {
-        if token.is_empty() || !is_valid_gnu_language_token(token) {
-            return false;
-        }
-        saw_any = true;
-    }
-    saw_any
-}
-
-fn is_hex_64(value: &str) -> bool {
-    value.len() == 64 && value.chars().all(|ch| ch.is_ascii_hexdigit())
-}
-
-fn is_valid_inbox_hint(value: &str) -> bool {
-    let trimmed = value.trim();
-    if is_hex_64(trimmed) {
-        return true;
-    }
-    for prefix in ["/iroh/", "/ma-iroh/", "/iroh-ma/", "/iroh+ma/"] {
-        if let Some(rest) = trimmed.strip_prefix(prefix) {
-            let endpoint = rest.split('/').next().unwrap_or_default();
-            return is_hex_64(endpoint);
-        }
-    }
-    false
-}
-
 fn is_valid_rfc3339_utc(value: &str) -> bool {
     let trimmed = value.trim();
     // Strict enough for ISO-8601 UTC produced by current implementations.
@@ -307,7 +219,7 @@ pub struct Document {
     #[serde(rename = "updatedAt", skip_serializing_if = "Option::is_none")]
     pub updated: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ma: Option<MaFields>,
+    pub ma: Option<serde_json::Value>,
 }
 
 impl Document {
@@ -331,14 +243,18 @@ impl Document {
         }
     }
 
-    fn ensure_ma_mut(&mut self) -> &mut MaFields {
-        self.ma.get_or_insert_with(MaFields::default)
+    /// Set the opaque `ma` extension namespace.
+    pub fn set_ma(&mut self, ma: serde_json::Value) {
+        if ma.is_null() || (ma.is_object() && ma.as_object().unwrap().is_empty()) {
+            self.ma = None;
+        } else {
+            self.ma = Some(ma);
+        }
     }
 
-    fn clear_ma_if_empty(&mut self) {
-        if self.ma.as_ref().is_some_and(MaFields::is_empty) {
-            self.ma = None;
-        }
+    /// Clear the `ma` extension namespace.
+    pub fn clear_ma(&mut self) {
+        self.ma = None;
     }
 
     pub fn to_cbor(&self) -> Result<Vec<u8>> {
@@ -404,155 +320,6 @@ impl Document {
         Ok(())
     }
 
-    pub fn set_presence_hint(&mut self, hint: impl Into<String>) -> Result<()> {
-        let hint = hint.into().trim().to_string();
-        if hint.is_empty() {
-            return Err(MaError::EmptyPresenceHint);
-        }
-        self.ensure_ma_mut().presence_hint = Some(hint);
-        Ok(())
-    }
-
-    pub fn clear_presence_hint(&mut self) {
-        if let Some(ma) = &mut self.ma {
-            ma.presence_hint = None;
-        }
-        self.clear_ma_if_empty();
-    }
-
-    pub fn set_ma_current_inbox(&mut self, inbox: impl Into<String>) {
-        let inbox = inbox.into().trim().to_string();
-        if inbox.is_empty() {
-            if let Some(ma) = &mut self.ma {
-                ma.current_inbox = None;
-            }
-            self.clear_ma_if_empty();
-            return;
-        }
-        self.ensure_ma_mut().current_inbox = Some(inbox);
-    }
-
-    pub fn clear_ma_current_inbox(&mut self) {
-        if let Some(ma) = &mut self.ma {
-            ma.current_inbox = None;
-        }
-        self.clear_ma_if_empty();
-    }
-
-    pub fn set_lang(&mut self, lang: impl Into<String>) -> Result<()> {
-        let lang = lang.into().trim().to_string();
-        if lang.is_empty() {
-            return Err(MaError::EmptyLang);
-        }
-        self.ensure_ma_mut().lang = Some(lang);
-        Ok(())
-    }
-
-    pub fn clear_lang(&mut self) {
-        if let Some(ma) = &mut self.ma {
-            ma.lang = None;
-        }
-        self.clear_ma_if_empty();
-    }
-
-    pub fn set_language(&mut self, language: impl Into<String>) -> Result<()> {
-        let language = language.into().trim().to_string();
-        if language.is_empty() {
-            return Err(MaError::EmptyLanguagePreference);
-        }
-        if !is_valid_gnu_language_list(&language) {
-            return Err(MaError::InvalidLanguagePreferenceFormat);
-        }
-        self.ensure_ma_mut().language = Some(language);
-        Ok(())
-    }
-
-    pub fn clear_language(&mut self) {
-        if let Some(ma) = &mut self.ma {
-            ma.language = None;
-        }
-        self.clear_ma_if_empty();
-    }
-
-    pub fn set_ma_type(&mut self, kind: impl Into<String>) -> Result<()> {
-        let kind = kind.into().trim().to_string();
-        if kind.is_empty() {
-            if let Some(ma) = &mut self.ma {
-                ma.kind = None;
-            }
-            self.clear_ma_if_empty();
-            return Ok(());
-        }
-        self.ensure_ma_mut().kind = Some(kind);
-        Ok(())
-    }
-
-    pub fn clear_ma_type(&mut self) {
-        if let Some(ma) = &mut self.ma {
-            ma.kind = None;
-        }
-        self.clear_ma_if_empty();
-    }
-
-    pub fn set_ma_world(&mut self, world: serde_json::Value) {
-        if world.is_null() {
-            if let Some(ma) = &mut self.ma {
-                ma.world = None;
-            }
-            self.clear_ma_if_empty();
-            return;
-        }
-        self.ensure_ma_mut().world = Some(world);
-    }
-
-    pub fn clear_ma_world(&mut self) {
-        if let Some(ma) = &mut self.ma {
-            ma.world = None;
-        }
-        self.clear_ma_if_empty();
-    }
-
-    pub fn set_ma_requested_ttl(&mut self, requested_ttl: u64) {
-        self.ensure_ma_mut().requested_ttl = Some(requested_ttl);
-    }
-
-    pub fn clear_ma_requested_ttl(&mut self) {
-        if let Some(ma) = &mut self.ma {
-            ma.requested_ttl = None;
-        }
-        self.clear_ma_if_empty();
-    }
-
-    pub fn set_ma_transports(&mut self, transports: serde_json::Value) {
-        self.ensure_ma_mut().transports = Some(transports);
-    }
-
-    pub fn clear_ma_transports(&mut self) {
-        if let Some(ma) = &mut self.ma {
-            ma.transports = None;
-        }
-        self.clear_ma_if_empty();
-    }
-
-    pub fn set_ma_state_cid(&mut self, cid: impl Into<String>) {
-        let value = cid.into().trim().to_string();
-        if value.is_empty() {
-            if let Some(ma) = &mut self.ma {
-                ma.state_cid = None;
-            }
-            self.clear_ma_if_empty();
-            return;
-        }
-        self.ensure_ma_mut().state_cid = Some(value);
-    }
-
-    pub fn clear_ma_state_cid(&mut self) {
-        if let Some(ma) = &mut self.ma {
-            ma.state_cid = None;
-        }
-        self.clear_ma_if_empty();
-    }
-
     pub fn set_created(&mut self, created: impl Into<String>) {
         let value = created.into().trim().to_string();
         if value.is_empty() {
@@ -569,48 +336,6 @@ impl Document {
             return;
         }
         self.updated = Some(value);
-    }
-
-    pub fn set_ma_deactivated(&mut self, deactivated: impl Into<String>) {
-        let value = deactivated.into().trim().to_string();
-        if value.is_empty() {
-            if let Some(ma) = &mut self.ma {
-                ma.deactivated = None;
-            }
-            self.clear_ma_if_empty();
-            return;
-        }
-        self.ensure_ma_mut().deactivated = Some(value);
-    }
-
-    pub fn clear_ma_deactivated(&mut self) {
-        if let Some(ma) = &mut self.ma {
-            ma.deactivated = None;
-        }
-        self.clear_ma_if_empty();
-    }
-
-    pub fn set_ma_ping_interval_secs(&mut self, secs: u32) {
-        self.ensure_ma_mut().ping_interval_secs = Some(secs);
-    }
-
-    pub fn clear_ma_ping_interval_secs(&mut self) {
-        if let Some(ma) = &mut self.ma {
-            ma.ping_interval_secs = None;
-        }
-        self.clear_ma_if_empty();
-    }
-
-    pub fn set_ma_version(&mut self, version: impl Into<String>) {
-        let value = version.into().trim().to_string();
-        if value.is_empty() {
-            if let Some(ma) = &mut self.ma {
-                ma.version = None;
-            }
-            self.clear_ma_if_empty();
-            return;
-        }
-        self.ensure_ma_mut().version = Some(value);
     }
 
     pub fn assertion_method_public_key(&self) -> Result<VerifyingKey> {
@@ -723,93 +448,15 @@ impl Document {
             Cid::try_from(identity.as_str()).map_err(|_| MaError::InvalidIdentity)?;
         }
 
-        if let Some(hint) = self.ma.as_ref().and_then(|ma| ma.presence_hint.as_ref()) {
-            if hint.trim().is_empty() {
-                return Err(MaError::EmptyPresenceHint);
-            }
-        }
-
-        if let Some(lang) = self.ma.as_ref().and_then(|ma| ma.lang.as_ref()) {
-            if lang.trim().is_empty() {
-                return Err(MaError::EmptyLang);
-            }
-        }
-
-        if let Some(language) = self.ma.as_ref().and_then(|ma| ma.language.as_ref()) {
-            if language.trim().is_empty() {
-                return Err(MaError::EmptyLanguagePreference);
-            }
-            if !is_valid_gnu_language_list(language) {
-                return Err(MaError::InvalidLanguagePreferenceFormat);
-            }
-        }
-
-        if let Some(inbox) = self.ma.as_ref().and_then(|ma| ma.current_inbox.as_ref()) {
-            if !is_valid_inbox_hint(inbox) {
-                return Err(MaError::InvalidMaCurrentInbox(inbox.clone()));
-            }
-        }
-
-        if let Some(world) = self.ma.as_ref().and_then(|ma| ma.world.as_ref()) {
-            // Accept either a DID string or an IPLD link object { "/": "<cid>" }
-            match world {
-                serde_json::Value::String(s) => {
-                    if Did::validate(s).is_err() {
-                        return Err(MaError::InvalidMaWorld(s.clone()));
-                    }
-                }
-                serde_json::Value::Object(obj) => {
-                    if obj.len() != 1 || !obj.contains_key("/") {
-                        return Err(MaError::InvalidMaWorld(world.to_string()));
-                    }
-                    let cid_val = &obj["/"];
-                    if let Some(cid_str) = cid_val.as_str() {
-                        if Cid::try_from(cid_str).is_err() {
-                            return Err(MaError::InvalidMaWorld(cid_str.to_string()));
-                        }
-                    } else {
-                        return Err(MaError::InvalidMaWorld(world.to_string()));
-                    }
-                }
-                _ => return Err(MaError::InvalidMaWorld(world.to_string())),
-            }
-        }
-
-        if let Some(transports) = self.ma.as_ref().and_then(|ma| ma.transports.as_ref()) {
-            if !transports.is_object() && !transports.is_array() {
-                return Err(MaError::InvalidMaTransports);
-            }
-        }
-
-        if let Some(state_cid) = self.ma.as_ref().and_then(|ma| ma.state_cid.as_ref()) {
-            if Cid::try_from(state_cid.as_str()).is_err() {
-                return Err(MaError::InvalidMaStateCid(state_cid.clone()));
-            }
-        }
-
         if let Some(created) = &self.created {
             if !is_valid_rfc3339_utc(created) {
-                return Err(MaError::InvalidMaCreated(created.clone()));
+                return Err(MaError::InvalidCreatedAt(created.clone()));
             }
         }
-
-        // ma.type is application-defined; did-ma places no restrictions on its value.
 
         if let Some(updated) = &self.updated {
             if !is_valid_rfc3339_utc(updated) {
-                return Err(MaError::InvalidMaUpdated(updated.clone()));
-            }
-        }
-
-        if let Some(deactivated) = self.ma.as_ref().and_then(|ma| ma.deactivated.as_ref()) {
-            if !is_valid_rfc3339_utc(deactivated) {
-                return Err(MaError::InvalidMaDeactivated(deactivated.clone()));
-            }
-        }
-
-        if let Some(version) = self.ma.as_ref().and_then(|ma| ma.version.as_ref()) {
-            if !is_valid_version_id(version) {
-                return Err(MaError::InvalidMaVersionId(version.clone()));
+                return Err(MaError::InvalidUpdatedAt(updated.clone()));
             }
         }
 
@@ -868,57 +515,49 @@ mod tests {
     use super::*;
 
     #[test]
-    fn set_ma_type_accepts_allowed_value() {
+    fn set_ma_stores_opaque_value() {
         let root = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr")
             .expect("valid test did");
         let mut document = Document::new(&root, &root);
 
-        document
-            .set_ma_type("agent")
-            .expect("agent should be accepted as ma.type");
-        assert_eq!(
-            document
-                .ma
-                .as_ref()
-                .and_then(|ma| ma.kind.as_ref())
-                .map(String::as_str),
-            Some("agent")
-        );
+        let ma = serde_json::json!({"type": "agent"});
+        document.set_ma(ma.clone());
+        assert_eq!(document.ma.as_ref(), Some(&ma));
     }
 
     #[test]
-    fn set_ma_type_accepts_any_value() {
+    fn clear_ma_removes_value() {
         let root = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr")
             .expect("valid test did");
         let mut document = Document::new(&root, &root);
 
-        document
-            .set_ma_type("cell")
-            .expect("cell should be accepted as ma.type");
-        assert_eq!(
-            document.ma.as_ref().and_then(|ma| ma.kind.as_ref()).map(String::as_str),
-            Some("cell")
-        );
-
-        document
-            .set_ma_type("bot")
-            .expect("bot should be accepted as ma.type");
-        assert_eq!(
-            document.ma.as_ref().and_then(|ma| ma.kind.as_ref()).map(String::as_str),
-            Some("bot")
-        );
+        document.set_ma(serde_json::json!({"type": "agent"}));
+        assert!(document.ma.is_some());
+        document.clear_ma();
+        assert!(document.ma.is_none());
     }
 
     #[test]
-    fn validate_accepts_arbitrary_ma_type() {
-        let identity = crate::identity::generate_agent_identity(
+    fn set_ma_null_clears() {
+        let root = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr")
+            .expect("valid test did");
+        let mut document = Document::new(&root, &root);
+
+        document.set_ma(serde_json::json!({"type": "agent"}));
+        document.set_ma(serde_json::Value::Null);
+        assert!(document.ma.is_none());
+    }
+
+    #[test]
+    fn validate_accepts_opaque_ma() {
+        let identity = crate::identity::generate_identity(
             "k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr",
         )
         .expect("generate identity");
         let mut document = identity.document;
-        document.set_ma_type("bahner").expect("set_ma_type");
+        document.set_ma(serde_json::json!({"type": "bahner", "custom": 42}));
         document
             .validate()
-            .expect("validate should accept any ma.type value");
+            .expect("validate should accept any ma value");
     }
 }

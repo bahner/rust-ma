@@ -15,7 +15,7 @@ pub use doc::{
     VerificationMethod, now_iso_utc,
 };
 pub use error::{MaError, Result};
-pub use identity::{GeneratedIdentity, generate_agent_identity};
+pub use identity::{GeneratedIdentity, generate_identity};
 pub use key::{
     ASSERTION_METHOD_KEY_TYPE, ED25519_PUB_CODEC, EDDSA_SIG_CODEC, EncryptionKey,
     KEY_AGREEMENT_KEY_TYPE, SigningKey, X25519_PUB_CODEC,

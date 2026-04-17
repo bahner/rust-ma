@@ -8,7 +8,9 @@ pub struct GeneratedIdentity {
     pub encryption_private_key_hex: String,
 }
 
-pub fn generate_agent_identity(ipns: &str) -> Result<GeneratedIdentity> {
+/// Generate a base DID identity with keys and a signed document.
+/// No `ma` extension fields are set — those are application-specific.
+pub fn generate_identity(ipns: &str) -> Result<GeneratedIdentity> {
     let root_did = Did::new_root(ipns)?;
     let sign_did = Did::new_root(ipns)?;
     let enc_did = Did::new_root(ipns)?;
@@ -39,7 +41,6 @@ pub fn generate_agent_identity(ipns: &str) -> Result<GeneratedIdentity> {
     document.add_verification_method(key_agreement_vm.clone())?;
     document.assertion_method = vec![assertion_vm_id];
     document.key_agreement = vec![key_agreement_vm.id.clone()];
-    document.set_ma_type("agent")?;
     document.sign(&signing_key, &assertion_vm)?;
 
     Ok(GeneratedIdentity {

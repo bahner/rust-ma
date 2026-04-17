@@ -9,7 +9,7 @@ license = "GPL-3.0-only"
 repository = "https://github.com/bahner/rust-ma"
 homepage = "https://github.com/bahner/rust-ma"
 documentation = "https://docs.rs/ma-did"
-keywords = ["did", "identity", "messaging", "multiformat", "iroh"]
+keywords = ["did", "identity", "messaging", "multiformat", "cbor"]
 
 [dependencies]
 blake3 = "1.8"

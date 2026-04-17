@@ -70,30 +70,10 @@ pub enum MaError {
     InvalidDocumentSignature,
     #[error("message signature is invalid")]
     InvalidMessageSignature,
-    #[error("presence hint is empty")]
-    EmptyPresenceHint,
-    #[error("lang is empty")]
-    EmptyLang,
-    #[error("language preference list is empty")]
-    EmptyLanguagePreference,
-    #[error("language preference must follow GNU LANGUAGE format (colon-separated language list)")]
-    InvalidLanguagePreferenceFormat,
-    #[error("invalid ma.world DID: {0}")]
-    InvalidMaWorld(String),
-    #[error("invalid ma.currentInbox value: {0}")]
-    InvalidMaCurrentInbox(String),
-    #[error("invalid ma.transports value: expected object or array")]
-    InvalidMaTransports,
-    #[error("invalid ma.stateCid: {0}")]
-    InvalidMaStateCid(String),
     #[error("invalid createdAt timestamp: {0}")]
-    InvalidMaCreated(String),
+    InvalidCreatedAt(String),
     #[error("invalid updatedAt timestamp: {0}")]
-    InvalidMaUpdated(String),
-    #[error("invalid ma.deactivated timestamp: {0}")]
-    InvalidMaDeactivated(String),
-    #[error("invalid ma.version: {0}")]
-    InvalidMaVersionId(String),
+    InvalidUpdatedAt(String),
     #[error("identity CID is invalid")]
     InvalidIdentity,
     #[error("missing envelope field: {0}")]

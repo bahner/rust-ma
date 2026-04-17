@@ -70,4 +70,4 @@ Example flow:
 
 - This is a library crate; consumer crates compile it transitively.
 - Direct document formatting should remain inside `ma-did` APIs.
-- See [ma-spec](../ma-spec/) for the formal DID method specification intended for W3C registration.
+- See [ma-spec](https://github.com/bahner/ma-spec) for the formal DID method specification intended for W3C registration.
