@@ -1,5 +1,6 @@
 use cid::Cid;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ipld_core::ipld::Ipld;
 use serde::{Deserialize, Serialize};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -196,7 +197,7 @@ fn is_valid_rfc3339_utc(value: &str) -> bool {
 /// A `did:ma:` DID document.
 ///
 /// Contains verification methods, proof, and optional extension data.
-/// Documents are signed with Ed25519 over a BLAKE3 hash of the CBOR-serialized
+/// Documents are signed with Ed25519 over a BLAKE3 hash of the dag-cbor-serialized
 /// payload (all fields except `proof`).
 ///
 /// # Examples
@@ -227,15 +228,23 @@ fn is_valid_rfc3339_utc(value: &str) -> bool {
 ///
 /// # Extension namespace
 ///
-/// The `ma` field is an opaque `serde_json::Value` for application-defined
+/// The `ma` field is an opaque IPLD value for application-defined
 /// extension data. did-ma does not interpret or validate its contents.
+/// Using [`Ipld`] gives native support for CID links and dag-cbor/dag-json
+/// round-tripping.
 ///
 /// ```
+/// use std::collections::BTreeMap;
+/// use ipld_core::ipld::Ipld;
 /// use ma_did::{Did, Document};
 ///
 /// let did = Did::new_url("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr", None::<String>).unwrap();
 /// let mut doc = Document::new(&did, &did);
-/// doc.set_ma(serde_json::json!({"type": "agent", "services": {}}));
+/// let ma = Ipld::Map(BTreeMap::from([
+///     ("type".into(), Ipld::String("agent".into())),
+///     ("services".into(), Ipld::Map(BTreeMap::new())),
+/// ]));
+/// doc.set_ma(ma);
 /// assert!(doc.ma.is_some());
 /// doc.clear_ma();
 /// assert!(doc.ma.is_none());
@@ -260,7 +269,7 @@ pub struct Document {
     #[serde(rename = "updatedAt", skip_serializing_if = "Option::is_none")]
     pub updated: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ma: Option<serde_json::Value>,
+    pub ma: Option<Ipld>,
 }
 
 impl Document {
@@ -285,11 +294,11 @@ impl Document {
     }
 
     /// Set the opaque `ma` extension namespace.
-    pub fn set_ma(&mut self, ma: serde_json::Value) {
-        if ma.is_null() || (ma.is_object() && ma.as_object().unwrap().is_empty()) {
-            self.ma = None;
-        } else {
-            self.ma = Some(ma);
+    pub fn set_ma(&mut self, ma: Ipld) {
+        match &ma {
+            Ipld::Null => self.ma = None,
+            Ipld::Map(m) if m.is_empty() => self.ma = None,
+            _ => self.ma = Some(ma),
         }
     }
 
@@ -299,14 +308,13 @@ impl Document {
     }
 
     pub fn to_cbor(&self) -> Result<Vec<u8>> {
-        let mut out = Vec::new();
-        ciborium::ser::into_writer(self, &mut out)
-            .map_err(|error| MaError::CborEncode(error.to_string()))?;
-        Ok(out)
+        serde_ipld_dagcbor::to_vec(self)
+            .map_err(|error| MaError::CborEncode(error.to_string()))
     }
 
     pub fn from_cbor(bytes: &[u8]) -> Result<Self> {
-        ciborium::de::from_reader(bytes).map_err(|error| MaError::CborDecode(error.to_string()))
+        serde_ipld_dagcbor::from_slice(bytes)
+            .map_err(|error| MaError::CborDecode(error.to_string()))
     }
 
     pub fn marshal(&self) -> Result<String> {
@@ -318,11 +326,14 @@ impl Document {
     }
 
     fn to_json(&self) -> Result<String> {
-        serde_json::to_string(self).map_err(|error| MaError::JsonEncode(error.to_string()))
+        let bytes = serde_ipld_dagjson::to_vec(self)
+            .map_err(|error| MaError::JsonEncode(error.to_string()))?;
+        String::from_utf8(bytes).map_err(|error| MaError::JsonEncode(error.to_string()))
     }
 
     fn from_json(s: &str) -> Result<Self> {
-        serde_json::from_str(s).map_err(|error| MaError::JsonDecode(error.to_string()))
+        serde_ipld_dagjson::from_slice(s.as_bytes())
+            .map_err(|error| MaError::JsonDecode(error.to_string()))
     }
 
     pub fn add_controller(&mut self, controller: impl Into<String>) -> Result<()> {
@@ -558,6 +569,7 @@ impl TryFrom<&SigningKey> for VerificationMethod {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
 
     #[test]
     fn set_ma_stores_opaque_value() {
@@ -568,7 +580,9 @@ mod tests {
         .expect("valid test did");
         let mut document = Document::new(&root, &root);
 
-        let ma = serde_json::json!({"type": "agent"});
+        let ma = Ipld::Map(BTreeMap::from([
+            ("type".into(), Ipld::String("agent".into())),
+        ]));
         document.set_ma(ma.clone());
         assert_eq!(document.ma.as_ref(), Some(&ma));
     }
@@ -582,7 +596,9 @@ mod tests {
         .expect("valid test did");
         let mut document = Document::new(&root, &root);
 
-        document.set_ma(serde_json::json!({"type": "agent"}));
+        document.set_ma(Ipld::Map(BTreeMap::from([
+            ("type".into(), Ipld::String("agent".into())),
+        ])));
         assert!(document.ma.is_some());
         document.clear_ma();
         assert!(document.ma.is_none());
@@ -597,8 +613,10 @@ mod tests {
         .expect("valid test did");
         let mut document = Document::new(&root, &root);
 
-        document.set_ma(serde_json::json!({"type": "agent"}));
-        document.set_ma(serde_json::Value::Null);
+        document.set_ma(Ipld::Map(BTreeMap::from([
+            ("type".into(), Ipld::String("agent".into())),
+        ])));
+        document.set_ma(Ipld::Null);
         assert!(document.ma.is_none());
     }
 
@@ -609,7 +627,10 @@ mod tests {
         )
         .expect("generate identity");
         let mut document = identity.document;
-        document.set_ma(serde_json::json!({"type": "bahner", "custom": 42}));
+        document.set_ma(Ipld::Map(BTreeMap::from([
+            ("type".into(), Ipld::String("bahner".into())),
+            ("custom".into(), Ipld::Integer(42)),
+        ])));
         document
             .validate()
             .expect("validate should accept any ma value");

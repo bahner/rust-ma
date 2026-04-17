@@ -1,6 +1,6 @@
 [package]
 name = "ma-did"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.95"
 description = "Rust implementation of the 間 (did:ma) DID method for secure identities and messaging"
@@ -9,7 +9,7 @@ license = "GPL-3.0-only"
 repository = "https://github.com/bahner/rust-ma"
 homepage = "https://github.com/bahner/rust-ma"
 documentation = "https://docs.rs/ma-did"
-keywords = ["did", "identity", "messaging", "multiformat", "cbor"]
+keywords = ["did", "identity", "messaging", "multiformat", "cbor", "ipld"]
 
 [dependencies]
 blake3 = "1.8"
@@ -18,11 +18,13 @@ cid = "0.11"
 ciborium = "0.2"
 ed25519-dalek = { version = "2.2", features = ["rand_core"] }
 hex = "0.4"
+ipld-core = { version = "0.4", features = ["serde"] }
 multibase = "0.9"
 nanoid = "0.4"
 rand_core = { version = "0.6", features = ["getrandom"] }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde_ipld_dagcbor = "0.6"
+serde_ipld_dagjson = "0.2"
 thiserror = "2.0"
 unsigned-varint = "0.8"
 x25519-dalek = { version = "2.0", features = ["static_secrets"] }
