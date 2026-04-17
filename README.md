@@ -1,37 +1,87 @@
 # ma-did
 
-A Rust implementation of the [間 (`did:ma`) DID method](https://github.com/bahner/ma-spec) — a modern, lean decentralized identifier method providing secure identities as a foundation for secure messaging.
+A Rust implementation of the
+[間 (`did:ma`) DID method](https://github.com/bahner/ma-spec)
+— a modern, lean decentralized identifier method providing
+secure identities as a foundation for secure messaging.
 
 ## What It Provides
 
-- **DID parsing and validation** — `did:ma:<ipns>` with optional `#fragment` for sub-identities within a namespace
-- **DID documents** — `Document`, `VerificationMethod`, and `Proof` types conforming to [W3C DID v1.1](https://www.w3.org/TR/did-1.1/)
-- **Cryptographic key types** — Ed25519 signing keys (`SigningKey`) and X25519 encryption keys (`EncryptionKey`) with `Multikey` encoding
-- **Multiformat pipeline** — multibase (Base58btc) + multicodec encoding/decoding for public keys and signatures
-- **Identity generation** — one-call `generate_identity()` produces keys, verification methods, and a signed document
-- **Document proofs** — `MultiformatSignature2023` proof type (BLAKE3 + Ed25519 over CBOR)
-- **Signed messages** — `Message` with BLAKE3 content hashing, Ed25519 signature, TTL, and replay-window freshness checks
-- **Encrypted envelopes** — `Envelope` using ephemeral X25519 key agreement + XChaCha20-Poly1305 AEAD
-- **Serialization** — JSON (`marshal`/`unmarshal`) and CBOR (`to_cbor`/`from_cbor`) for both documents and messages
-- **Method-specific extension** — optional `ma` namespace on documents for application-defined fields
-- **WASM support** — compiles to `wasm32-unknown-unknown` with JS time sources
+- **DID parsing and validation** —
+  `did:ma:<ipns>` with optional `#fragment`
+  for sub-identities within a namespace
+- **DID documents** —
+  `Document`, `VerificationMethod`, and `Proof` types
+  conforming to [W3C DID v1.1](https://www.w3.org/TR/did-1.1/)
+- **Cryptographic key types** —
+  Ed25519 signing keys (`SigningKey`) and
+  X25519 encryption keys (`EncryptionKey`)
+  with `Multikey` encoding
+- **Multiformat pipeline** —
+  multibase (Base58btc) + multicodec encoding/decoding
+  for public keys and signatures
+- **Identity generation** —
+  one-call `generate_identity()` produces keys,
+  verification methods, and a signed document
+- **Document proofs** —
+  `MultiformatSignature2023` proof type
+  (BLAKE3 + Ed25519 over CBOR)
+- **Signed messages** —
+  `Message` with BLAKE3 content hashing,
+  Ed25519 signature, TTL,
+  and replay-window freshness checks
+- **Encrypted envelopes** —
+  `Envelope` using ephemeral X25519 key agreement
+  with XChaCha20-Poly1305 AEAD
+- **Serialization** —
+  JSON (`marshal`/`unmarshal`) and
+  CBOR (`to_cbor`/`from_cbor`)
+  for both documents and messages
+- **Method-specific extension** —
+  optional `ma` namespace on documents
+  for application-defined fields
+- **WASM support** —
+  compiles to `wasm32-unknown-unknown`
+  with JS time sources
 
 ## Specification
 
-This crate implements the formal `did:ma` method specification documents at [bahner/ma-spec](https://github.com/bahner/ma-spec):
+This crate implements the formal `did:ma` method
+specification documents at
+[bahner/ma-spec](https://github.com/bahner/ma-spec):
 
-- [DID Method Specification](https://github.com/bahner/ma-spec/blob/main/did-method-spec.md) — method syntax, CRUD operations, verifiable data registry
-- [DID Document Format](https://github.com/bahner/ma-spec/blob/main/did-document-format.md) — document structure, `Multikey` verification methods, proof type
-- [Extension Fields Format](https://github.com/bahner/ma-spec/blob/main/did-ma-fields-format.md) — method-specific `ma` namespace
-- [Messaging Format](https://github.com/bahner/ma-spec/blob/main/messaging-format.md) — signed CBOR messages, encryption envelopes, replay protection
+- [DID Method Specification][method-spec] —
+  method syntax, CRUD operations, verifiable data registry
+- [DID Document Format][doc-format] —
+  document structure, `Multikey` verification methods,
+  proof type
+- [Extension Fields Format][fields-format] —
+  method-specific `ma` namespace
+- [Messaging Format][msg-format] —
+  signed CBOR messages, encryption envelopes,
+  replay protection
+
+[method-spec]: https://github.com/bahner/ma-spec/blob/main/did-method-spec.md
+[doc-format]: https://github.com/bahner/ma-spec/blob/main/did-document-format.md
+[fields-format]: https://github.com/bahner/ma-spec/blob/main/did-ma-fields-format.md
+[msg-format]: https://github.com/bahner/ma-spec/blob/main/messaging-format.md
 
 ## References
 
-- [W3C DID Core v1.1](https://www.w3.org/TR/did-1.1/) — Decentralized Identifiers specification
-- [Nano ID](https://github.com/ai/nanoid) — DID URL fragment generation and validation (`[A-Za-z0-9_-]+`)
-- [Multibase](https://github.com/multiformats/multibase) / [Multicodec](https://github.com/multiformats/multicodec) — key and signature encoding
-- [BLAKE3](https://github.com/BLAKE3-team/BLAKE3) — content hashing for proofs and messages
-- [IPNS](https://docs.ipfs.tech/concepts/ipns/) — DID method-specific identifier
+- [W3C DID Core v1.1](https://www.w3.org/TR/did-1.1/) —
+  Decentralized Identifiers specification
+- [Nano ID](https://github.com/ai/nanoid) —
+  DID URL fragment generation and validation
+  (`[A-Za-z0-9_-]+`)
+- [Multibase][mb] / [Multicodec][mc] —
+  key and signature encoding
+- [BLAKE3](https://github.com/BLAKE3-team/BLAKE3) —
+  content hashing for proofs and messages
+- [IPNS](https://docs.ipfs.tech/concepts/ipns/) —
+  DID method-specific identifier
+
+[mb]: https://github.com/multiformats/multibase
+[mc]: https://github.com/multiformats/multicodec
 
 ## Project Layout
 
