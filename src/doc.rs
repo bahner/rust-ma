@@ -493,16 +493,16 @@ impl Document {
             Cid::try_from(identity.as_str()).map_err(|_| MaError::InvalidIdentity)?;
         }
 
-        if let Some(created) = &self.created {
-            if !is_valid_rfc3339_utc(created) {
-                return Err(MaError::InvalidCreatedAt(created.clone()));
-            }
+        if let Some(created) = &self.created
+            && !is_valid_rfc3339_utc(created)
+        {
+            return Err(MaError::InvalidCreatedAt(created.clone()));
         }
 
-        if let Some(updated) = &self.updated {
-            if !is_valid_rfc3339_utc(updated) {
-                return Err(MaError::InvalidUpdatedAt(updated.clone()));
-            }
+        if let Some(updated) = &self.updated
+            && !is_valid_rfc3339_utc(updated)
+        {
+            return Err(MaError::InvalidUpdatedAt(updated.clone()));
         }
 
         for method in &self.verification_method {

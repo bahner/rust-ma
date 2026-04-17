@@ -2,7 +2,7 @@
 name = "ma-did"
 version = "0.2.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.95"
 description = "Rust implementation of the 間 (did:ma) DID method for secure identities and messaging"
 readme = "README.md"
 license = "GPL-3.0-only"
