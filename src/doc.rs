@@ -264,10 +264,10 @@ pub struct Document {
     pub proof: Proof,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identity: Option<String>,
-    #[serde(rename = "createdAt", skip_serializing_if = "Option::is_none")]
-    pub created: Option<String>,
-    #[serde(rename = "updatedAt", skip_serializing_if = "Option::is_none")]
-    pub updated: Option<String>,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ma: Option<Ipld>,
 }
@@ -287,8 +287,8 @@ impl Document {
             key_agreement: Vec::new(),
             proof: Proof::default(),
             identity: None,
-            created: Some(now.clone()),
-            updated: Some(now),
+            created_at: now.clone(),
+            updated_at: now,
             ma: None,
         }
     }
@@ -371,22 +371,9 @@ impl Document {
         Ok(())
     }
 
-    pub fn set_created(&mut self, created: impl Into<String>) {
-        let value = created.into().trim().to_string();
-        if value.is_empty() {
-            self.created = None;
-            return;
-        }
-        self.created = Some(value);
-    }
-
-    pub fn set_updated(&mut self, updated: impl Into<String>) {
-        let value = updated.into().trim().to_string();
-        if value.is_empty() {
-            self.updated = None;
-            return;
-        }
-        self.updated = Some(value);
+    /// Update the `updatedAt` timestamp to the current time.
+    pub fn touch(&mut self) {
+        self.updated_at = now_iso_utc();
     }
 
     pub fn assertion_method_public_key(&self) -> Result<VerifyingKey> {
@@ -503,16 +490,12 @@ impl Document {
             Cid::try_from(identity.as_str()).map_err(|_| MaError::InvalidIdentity)?;
         }
 
-        if let Some(created) = &self.created
-            && !is_valid_rfc3339_utc(created)
-        {
-            return Err(MaError::InvalidCreatedAt(created.clone()));
+        if !is_valid_rfc3339_utc(&self.created_at) {
+            return Err(MaError::InvalidCreatedAt(self.created_at.clone()));
         }
 
-        if let Some(updated) = &self.updated
-            && !is_valid_rfc3339_utc(updated)
-        {
-            return Err(MaError::InvalidUpdatedAt(updated.clone()));
+        if !is_valid_rfc3339_utc(&self.updated_at) {
+            return Err(MaError::InvalidUpdatedAt(self.updated_at.clone()));
         }
 
         for method in &self.verification_method {
