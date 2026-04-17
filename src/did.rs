@@ -1,7 +1,4 @@
-use std::sync::OnceLock;
-
 use nanoid::nanoid;
-use regex::Regex;
 
 use crate::error::{MaError, Result};
 
@@ -160,12 +157,12 @@ fn validate_identifier(input: &str) -> Result<()> {
     Ok(())
 }
 
-static FRAGMENT_RE: OnceLock<Regex> = OnceLock::new();
-
 fn validate_fragment(input: &str) -> Result<()> {
-    let re = FRAGMENT_RE
-        .get_or_init(|| Regex::new(r"^[a-zA-Z0-9_-]+$").expect("fragment regex must compile"));
-    if !re.is_match(input) {
+    if input.is_empty()
+        || !input
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+    {
         return Err(MaError::InvalidFragment(input.to_string()));
     }
     Ok(())
