@@ -1,19 +1,29 @@
 # ma-did
 
-A Rust library for DID- and message-oriented identity primitives used by the ma actor stack.
+A Rust implementation of the [間 (`did:ma`) DID method](https://github.com/bahner/ma-spec) — a modern, lean decentralized identifier method providing secure identities as a foundation for secure messaging.
 
 ## What It Provides
 
-- DID parsing/validation (`did:ma:*`) with root and fragment handling
-- DID document model (`Document`, `VerificationMethod`, `Proof`)
-- Opaque `ma` extension namespace on documents (`Option<serde_json::Value>`)
-- Signing/encryption key helpers (`SigningKey`, `EncryptionKey`) using Ed25519 and X25519
-- Multiformat encoding pipeline (multibase + multicodec) for public keys and signatures
-- Message and envelope primitives with replay protection (`Message`, `Envelope`, `ReplayGuard`)
-- Proof type: `MultiformatSignature2023` (BLAKE3 + Ed25519 over CBOR-serialized documents)
-- Serialization:
-  - `Document::marshal()` / `Document::unmarshal()` for JSON
-  - `Document::to_cbor()` / `Document::from_cbor()` for CBOR
+- **DID parsing and validation** — `did:ma:<ipns>` with optional `#fragment` for sub-identities within a namespace
+- **DID documents** — `Document`, `VerificationMethod`, and `Proof` types conforming to [W3C DID v1.1](https://www.w3.org/TR/did-1.1/)
+- **Cryptographic key types** — Ed25519 signing keys (`SigningKey`) and X25519 encryption keys (`EncryptionKey`) with `Multikey` encoding
+- **Multiformat pipeline** — multibase (Base58btc) + multicodec encoding/decoding for public keys and signatures
+- **Identity generation** — one-call `generate_identity()` produces keys, verification methods, and a signed document
+- **Document proofs** — `MultiformatSignature2023` proof type (BLAKE3 + Ed25519 over CBOR)
+- **Signed messages** — `Message` with BLAKE3 content hashing, Ed25519 signature, TTL, and replay-window freshness checks
+- **Encrypted envelopes** — `Envelope` using ephemeral X25519 key agreement + XChaCha20-Poly1305 AEAD
+- **Serialization** — JSON (`marshal`/`unmarshal`) and CBOR (`to_cbor`/`from_cbor`) for both documents and messages
+- **Method-specific extension** — optional `ma` namespace on documents for application-defined fields
+- **WASM support** — compiles to `wasm32-unknown-unknown` with JS time sources
+
+## Specification
+
+This crate implements the formal `did:ma` method specification documents at [bahner/ma-spec](https://github.com/bahner/ma-spec):
+
+- [DID Method Specification](https://github.com/bahner/ma-spec/blob/main/did-method-spec.md) — method syntax, CRUD operations, verifiable data registry
+- [DID Document Format](https://github.com/bahner/ma-spec/blob/main/did-document-format.md) — document structure, `Multikey` verification methods, proof type
+- [Extension Fields Format](https://github.com/bahner/ma-spec/blob/main/did-ma-fields-format.md) — method-specific `ma` namespace
+- [Messaging Format](https://github.com/bahner/ma-spec/blob/main/messaging-format.md) — signed CBOR messages, encryption envelopes, replay protection
 
 ## Project Layout
 
@@ -21,62 +31,40 @@ A Rust library for DID- and message-oriented identity primitives used by the ma 
 - `src/did.rs`: DID model and validation
 - `src/doc.rs`: DID document, proof, and verification method model
 - `src/error.rs`: crate error types
-- `src/identity.rs`: key+document generation helper
+- `src/identity.rs`: key + document generation helper
 - `src/key.rs`: key generation, multibase encoding, Ed25519/X25519 key types
 - `src/lib.rs`: public exports
 - `src/msg.rs`: message, headers, envelope, and replay guard
 - `src/multiformat.rs`: multibase/multicodec encoding and decoding pipeline
 
-## Build and Cleanup
-
-Use the Makefile:
-
-```bash
-make build
-make clean
-make distclean
-```
-
-Equivalent cargo commands:
+## Build
 
 ```bash
 cargo build
 cargo test
 ```
 
-## Usage (Library)
-
-Add as dependency:
-
-```toml
-[dependencies]
-ma-did = "0.1"
-```
-
-Local path dependency during development:
+## Usage
 
 ```toml
 [dependencies]
 ma-did = { path = "../did" }
 ```
 
-Example — identity and document:
+### Identity and documents
 
-1. Create a root DID and method DIDs.
-2. Generate signing/encryption keys.
-3. Build a `Document` and add verification methods.
-4. Sign document proof.
-5. Marshal/unmarshal via crate APIs.
+1. Generate signing and encryption keys.
+2. Build a `Document` with verification methods.
+3. Sign the document proof.
+4. Marshal/unmarshal via JSON or CBOR.
 
-Example — messages:
+### Messages
 
 1. Create a `Message` with sender DID, recipient DID, content type, and content bytes.
 2. The message is signed automatically on creation using the sender's `SigningKey`.
 3. Verify a received message with `message.verify_with_document(&sender_document)`.
 4. Wrap in an `Envelope` for encrypted transport (X25519 + XChaCha20-Poly1305).
 
-## Notes
+## License
 
-- This is a library crate; consumer crates compile it transitively.
-- Direct document formatting should remain inside `ma-did` APIs.
-- See [ma-spec](https://github.com/bahner/ma-spec) for the formal DID method specification intended for W3C registration.
+GPL-3.0-only
