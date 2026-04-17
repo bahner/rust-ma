@@ -1,6 +1,6 @@
 [package]
 name = "ma-did"
-version = "0.2.0"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.95"
 description = "Rust implementation of the 間 (did:ma) DID method for secure identities and messaging"
