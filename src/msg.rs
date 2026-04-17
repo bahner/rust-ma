@@ -32,6 +32,10 @@ pub fn message_type() -> String {
     format!("{MESSAGE_PREFIX}{}", constants::VERSION)
 }
 
+/// Signed message headers (without content body).
+///
+/// Headers include a BLAKE3 hash of the content for integrity verification.
+/// Extracted from a [`Message`] via [`Message::headers`] or [`Message::unsigned_headers`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Headers {
     pub id: String,
@@ -82,6 +86,43 @@ impl Headers {
     }
 }
 
+/// A signed actor-to-actor message.
+///
+/// Messages are signed on creation using the sender's [`SigningKey`].
+/// The signature covers the CBOR-serialized headers (including a BLAKE3
+/// hash of the content), ensuring both integrity and authenticity.
+///
+/// # Examples
+///
+/// ```
+/// use ma_did::{generate_identity, Message, SigningKey, Did};
+///
+/// let sender = generate_identity("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr").unwrap();
+/// let recipient = generate_identity("k51qzi5uqu5dl96qbq93mwl5drvk2z83fk4s6h4n7xgqnwrxlscs11i1bja7uk").unwrap();
+///
+/// let sign_did = Did::new_root(&sender.root_did.ipns).unwrap();
+/// let signing_key = SigningKey::from_private_key_bytes(
+///     sign_did,
+///     hex::decode(&sender.signing_private_key_hex).unwrap().try_into().unwrap(),
+/// ).unwrap();
+///
+/// // Create a signed message
+/// let msg = Message::new(
+///     sender.document.id.clone(),
+///     recipient.document.id.clone(),
+///     "text/plain",
+///     b"hello".to_vec(),
+///     &signing_key,
+/// ).unwrap();
+///
+/// // Verify against sender's document
+/// msg.verify_with_document(&sender.document).unwrap();
+///
+/// // Serialize to CBOR
+/// let bytes = msg.to_cbor().unwrap();
+/// let restored = Message::from_cbor(&bytes).unwrap();
+/// assert_eq!(msg.id, restored.id);
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
     pub id: String,
@@ -273,6 +314,21 @@ impl Message {
     }
 }
 
+/// Sliding-window replay guard for message deduplication.
+///
+/// Tracks seen message IDs within a configurable time window and rejects
+/// duplicates. Use with [`Envelope::open_with_replay_guard`] for
+/// transport-level replay protection.
+///
+/// # Examples
+///
+/// ```
+/// use ma_did::ReplayGuard;
+///
+/// let mut guard = ReplayGuard::new(120); // 2-minute window
+/// // or use the default (120 seconds):
+/// let mut guard = ReplayGuard::default();
+/// ```
 #[derive(Debug, Clone)]
 pub struct ReplayGuard {
     seen: HashMap<String, u64>,
@@ -311,6 +367,46 @@ impl ReplayGuard {
     }
 }
 
+/// An encrypted message envelope for transport.
+///
+/// Contains an ephemeral X25519 public key and XChaCha20-Poly1305 encrypted
+/// headers and content. Created by [`Message::enclose_for`] and opened by
+/// [`Envelope::open`] or [`Envelope::open_with_replay_guard`].
+///
+/// # Examples
+///
+/// ```
+/// use ma_did::{generate_identity, Message, Envelope, EncryptionKey, SigningKey, Did};
+///
+/// let alice = generate_identity("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr").unwrap();
+/// let bob = generate_identity("k51qzi5uqu5dl96qbq93mwl5drvk2z83fk4s6h4n7xgqnwrxlscs11i1bja7uk").unwrap();
+///
+/// let alice_sign_did = Did::new_root(&alice.root_did.ipns).unwrap();
+/// let alice_key = SigningKey::from_private_key_bytes(
+///     alice_sign_did,
+///     hex::decode(&alice.signing_private_key_hex).unwrap().try_into().unwrap(),
+/// ).unwrap();
+///
+/// let msg = Message::new(
+///     alice.document.id.clone(),
+///     bob.document.id.clone(),
+///     "text/plain",
+///     b"secret".to_vec(),
+///     &alice_key,
+/// ).unwrap();
+///
+/// // Encrypt for Bob
+/// let envelope = msg.enclose_for(&bob.document).unwrap();
+///
+/// // Bob decrypts
+/// let bob_enc_did = Did::new_root(&bob.root_did.ipns).unwrap();
+/// let bob_enc_key = EncryptionKey::from_private_key_bytes(
+///     bob_enc_did,
+///     hex::decode(&bob.encryption_private_key_hex).unwrap().try_into().unwrap(),
+/// ).unwrap();
+/// let decrypted = envelope.open(&bob.document, &bob_enc_key, &alice.document).unwrap();
+/// assert_eq!(decrypted.content, b"secret");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Envelope {
     #[serde(rename = "ephemeralKey")]
@@ -555,7 +651,11 @@ mod tests {
             sender_did.base_id(),
             sender_did.base_id(),
             sender_encryption.key_type.clone(),
-            sender_encryption.did.fragment.as_deref().unwrap_or_default(),
+            sender_encryption
+                .did
+                .fragment
+                .as_deref()
+                .unwrap_or_default(),
             sender_encryption.public_key_multibase.clone(),
         )
         .expect("sender key agreement vm");
@@ -576,7 +676,11 @@ mod tests {
             recipient_did.base_id(),
             recipient_did.base_id(),
             recipient_signing.key_type.clone(),
-            recipient_signing.did.fragment.as_deref().unwrap_or_default(),
+            recipient_signing
+                .did
+                .fragment
+                .as_deref()
+                .unwrap_or_default(),
             recipient_signing.public_key_multibase.clone(),
         )
         .expect("recipient assertion vm");
@@ -584,7 +688,11 @@ mod tests {
             recipient_did.base_id(),
             recipient_did.base_id(),
             recipient_encryption.key_type.clone(),
-            recipient_encryption.did.fragment.as_deref().unwrap_or_default(),
+            recipient_encryption
+                .did
+                .fragment
+                .as_deref()
+                .unwrap_or_default(),
             recipient_encryption.public_key_multibase.clone(),
         )
         .expect("recipient key agreement vm");

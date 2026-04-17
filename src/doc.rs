@@ -8,7 +8,9 @@ use crate::{
     did::Did,
     error::{MaError, Result},
     key::{ED25519_PUB_CODEC, EDDSA_SIG_CODEC, EncryptionKey, SigningKey, X25519_PUB_CODEC},
-    multiformat::{public_key_multibase_decode, signature_multibase_decode, signature_multibase_encode},
+    multiformat::{
+        public_key_multibase_decode, signature_multibase_decode, signature_multibase_encode,
+    },
 };
 
 pub const DEFAULT_DID_CONTEXT: &[&str] = &["https://www.w3.org/ns/did/v1.1"];
@@ -191,14 +193,53 @@ fn is_valid_rfc3339_utc(value: &str) -> bool {
     false
 }
 
-fn is_valid_version_id(value: &str) -> bool {
-    let trimmed = value.trim();
-    !trimmed.is_empty()
-        && trimmed
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-' | '+'))
-}
-
+/// A `did:ma:` DID document.
+///
+/// Contains verification methods, proof, and optional extension data.
+/// Documents are signed with Ed25519 over a BLAKE3 hash of the CBOR-serialized
+/// payload (all fields except `proof`).
+///
+/// # Examples
+///
+/// ```
+/// use ma_did::{generate_identity, Document};
+///
+/// let id = generate_identity(
+///     "k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr"
+/// ).unwrap();
+///
+/// // Verify the signature
+/// id.document.verify().unwrap();
+///
+/// // Validate structural correctness
+/// id.document.validate().unwrap();
+///
+/// // Round-trip through JSON
+/// let json = id.document.marshal().unwrap();
+/// let restored = Document::unmarshal(&json).unwrap();
+/// assert_eq!(id.document, restored);
+///
+/// // Round-trip through CBOR
+/// let cbor = id.document.to_cbor().unwrap();
+/// let restored = Document::from_cbor(&cbor).unwrap();
+/// assert_eq!(id.document, restored);
+/// ```
+///
+/// # Extension namespace
+///
+/// The `ma` field is an opaque `serde_json::Value` for application-defined
+/// extension data. did-ma does not interpret or validate its contents.
+///
+/// ```
+/// use ma_did::{Did, Document};
+///
+/// let did = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr").unwrap();
+/// let mut doc = Document::new(&did, &did);
+/// doc.set_ma(serde_json::json!({"type": "agent", "services": {}}));
+/// assert!(doc.ma.is_some());
+/// doc.clear_ma();
+/// assert!(doc.ma.is_none());
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Document {
     #[serde(rename = "@context")]
@@ -339,7 +380,9 @@ impl Document {
     }
 
     pub fn assertion_method_public_key(&self) -> Result<VerifyingKey> {
-        let assertion_id = self.assertion_method.first()
+        let assertion_id = self
+            .assertion_method
+            .first()
             .ok_or_else(|| MaError::UnknownVerificationMethod("assertionMethod".to_string()))?;
         let vm = self.get_verification_method_by_id(assertion_id)?;
         let (codec, public_key_bytes) = public_key_multibase_decode(&vm.public_key_multibase)?;
@@ -363,7 +406,9 @@ impl Document {
     }
 
     pub fn key_agreement_public_key_bytes(&self) -> Result<[u8; 32]> {
-        let agreement_id = self.key_agreement.first()
+        let agreement_id = self
+            .key_agreement
+            .first()
             .ok_or_else(|| MaError::UnknownVerificationMethod("keyAgreement".to_string()))?;
         let vm = self.get_verification_method_by_id(agreement_id)?;
         let (codec, public_key_bytes) = public_key_multibase_decode(&vm.public_key_multibase)?;

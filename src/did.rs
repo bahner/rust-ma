@@ -7,6 +7,27 @@ use crate::error::{MaError, Result};
 
 pub const DID_PREFIX: &str = "did:ma:";
 
+/// A parsed `did:ma:` DID.
+///
+/// A DID consists of an IPNS identifier and an optional fragment.
+/// The base form is `did:ma:<ipns>`, and with a fragment: `did:ma:<ipns>#<fragment>`.
+///
+/// # Examples
+///
+/// ```
+/// use ma_did::Did;
+///
+/// // Parse a DID with a fragment
+/// let did = Did::try_from("did:ma:k51qzi5uqu5abc#lobby").unwrap();
+/// assert_eq!(did.ipns, "k51qzi5uqu5abc");
+/// assert_eq!(did.fragment.as_deref(), Some("lobby"));
+/// assert_eq!(did.id(), "did:ma:k51qzi5uqu5abc#lobby");
+///
+/// // Parse a bare DID (no fragment)
+/// let bare = Did::try_from("did:ma:k51qzi5uqu5abc").unwrap();
+/// assert!(bare.is_bare());
+/// assert_eq!(bare.base_id(), "did:ma:k51qzi5uqu5abc");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Did {
     pub ipns: String,

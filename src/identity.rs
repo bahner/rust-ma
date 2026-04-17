@@ -1,5 +1,9 @@
 use crate::{Did, Document, EncryptionKey, Result, SigningKey, VerificationMethod};
 
+/// A generated DID identity with keys and a signed document.
+///
+/// Private keys are hex-encoded for storage. Use [`SigningKey::from_private_key_bytes`]
+/// and [`EncryptionKey::from_private_key_bytes`] to reconstruct key objects.
 #[derive(Debug, Clone)]
 pub struct GeneratedIdentity {
     pub root_did: Did,
@@ -9,7 +13,26 @@ pub struct GeneratedIdentity {
 }
 
 /// Generate a base DID identity with keys and a signed document.
+///
 /// No `ma` extension fields are set — those are application-specific.
+///
+/// # Examples
+///
+/// ```
+/// use ma_did::generate_identity;
+///
+/// let id = generate_identity(
+///     "k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr"
+/// ).unwrap();
+///
+/// // Document is signed and valid
+/// id.document.verify().unwrap();
+/// id.document.validate().unwrap();
+///
+/// // Private keys available for storage
+/// assert!(!id.signing_private_key_hex.is_empty());
+/// assert!(!id.encryption_private_key_hex.is_empty());
+/// ```
 pub fn generate_identity(ipns: &str) -> Result<GeneratedIdentity> {
     let root_did = Did::new_root(ipns)?;
     let sign_did = Did::new_root(ipns)?;
