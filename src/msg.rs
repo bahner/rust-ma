@@ -70,14 +70,29 @@ impl Headers {
 
         Did::validate(&self.from)?;
         let recipient_is_empty = self.to.trim().is_empty();
-        if recipient_is_empty {
-            if self.content_type != "application/x-ma-chat" {
-                return Err(MaError::InvalidRecipient);
+
+        match self.content_type.as_str() {
+            "application/x-ma-broadcast" => {
+                if !recipient_is_empty {
+                    return Err(MaError::BroadcastMustNotHaveRecipient);
+                }
             }
-        } else {
-            Did::validate(&self.to).map_err(|_| MaError::InvalidRecipient)?;
-            if self.from == self.to {
-                return Err(MaError::SameActor);
+            "application/x-ma-message" => {
+                if recipient_is_empty {
+                    return Err(MaError::MessageRequiresRecipient);
+                }
+                Did::validate(&self.to).map_err(|_| MaError::InvalidRecipient)?;
+                if self.from == self.to {
+                    return Err(MaError::SameActor);
+                }
+            }
+            _ => {
+                if !recipient_is_empty {
+                    Did::validate(&self.to).map_err(|_| MaError::InvalidRecipient)?;
+                    if self.from == self.to {
+                        return Err(MaError::SameActor);
+                    }
+                }
             }
         }
         validate_message_freshness(self.created_at, self.ttl)?;
@@ -181,6 +196,7 @@ impl Message {
             signature: Vec::new(),
         };
 
+        message.unsigned_headers().validate()?;
         message.validate_content()?;
         message.sign(signing_key)?;
         Ok(message)
@@ -915,35 +931,84 @@ mod tests {
     }
 
     #[test]
-    fn chat_allows_empty_recipient() {
+    fn broadcast_allows_empty_recipient() {
         let (sender_signing, _, sender_document, _, _, _) = fixture_documents();
         let message = Message::new(
             sender_document.id.clone(),
             String::new(),
-            "application/x-ma-chat",
-            b"hello room".to_vec(),
+            "application/x-ma-broadcast",
+            b"hello everyone".to_vec(),
             &sender_signing,
         )
-        .expect("chat message creation");
+        .expect("broadcast message creation");
 
         message
             .verify_with_document(&sender_document)
-            .expect("chat with empty recipient verifies");
+            .expect("broadcast with empty recipient verifies");
     }
 
     #[test]
-    fn non_chat_rejects_empty_recipient() {
+    fn broadcast_rejects_recipient() {
+        let (sender_signing, _, sender_document, _, _, recipient_document) = fixture_documents();
+        let result = Message::new(
+            sender_document.id.clone(),
+            recipient_document.id.clone(),
+            "application/x-ma-broadcast",
+            b"hello everyone".to_vec(),
+            &sender_signing,
+        );
+
+        assert!(matches!(
+            result,
+            Err(MaError::BroadcastMustNotHaveRecipient)
+        ));
+    }
+
+    #[test]
+    fn message_requires_recipient() {
+        let (sender_signing, _, sender_document, _, _, _) = fixture_documents();
+        let result = Message::new(
+            sender_document.id.clone(),
+            String::new(),
+            "application/x-ma-message",
+            b"secret".to_vec(),
+            &sender_signing,
+        );
+
+        assert!(matches!(result, Err(MaError::MessageRequiresRecipient)));
+    }
+
+    #[test]
+    fn unknown_content_type_allows_empty_recipient() {
         let (sender_signing, _, sender_document, _, _, _) = fixture_documents();
         let message = Message::new(
             sender_document.id.clone(),
             String::new(),
-            "application/x-ma-cmd",
-            b"look".to_vec(),
+            "application/x-ma-custom",
+            b"whatever".to_vec(),
             &sender_signing,
         )
-        .expect("command message creation");
+        .expect("custom content type message creation");
 
-        let result = message.verify_with_document(&sender_document);
-        assert!(matches!(result, Err(MaError::InvalidRecipient)));
+        message
+            .verify_with_document(&sender_document)
+            .expect("custom type with empty recipient verifies");
+    }
+
+    #[test]
+    fn unknown_content_type_allows_recipient() {
+        let (sender_signing, _, sender_document, _, _, recipient_document) = fixture_documents();
+        let message = Message::new(
+            sender_document.id.clone(),
+            recipient_document.id.clone(),
+            "application/x-ma-custom",
+            b"whatever".to_vec(),
+            &sender_signing,
+        )
+        .expect("custom content type with recipient");
+
+        message
+            .verify_with_document(&sender_document)
+            .expect("custom type with recipient verifies");
     }
 }

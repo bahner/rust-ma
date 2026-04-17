@@ -48,6 +48,10 @@ pub enum MaError {
     ReplayDetected,
     #[error("sender and recipient must differ")]
     SameActor,
+    #[error("broadcast messages must not have a recipient")]
+    BroadcastMustNotHaveRecipient,
+    #[error("encrypted messages require a recipient")]
+    MessageRequiresRecipient,
     #[error("context missing")]
     EmptyContext,
     #[error("controller missing")]
