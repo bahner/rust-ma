@@ -308,8 +308,7 @@ impl Document {
     }
 
     pub fn to_cbor(&self) -> Result<Vec<u8>> {
-        serde_ipld_dagcbor::to_vec(self)
-            .map_err(|error| MaError::CborEncode(error.to_string()))
+        serde_ipld_dagcbor::to_vec(self).map_err(|error| MaError::CborEncode(error.to_string()))
     }
 
     pub fn from_cbor(bytes: &[u8]) -> Result<Self> {
@@ -580,9 +579,10 @@ mod tests {
         .expect("valid test did");
         let mut document = Document::new(&root, &root);
 
-        let ma = Ipld::Map(BTreeMap::from([
-            ("type".into(), Ipld::String("agent".into())),
-        ]));
+        let ma = Ipld::Map(BTreeMap::from([(
+            "type".into(),
+            Ipld::String("agent".into()),
+        )]));
         document.set_ma(ma.clone());
         assert_eq!(document.ma.as_ref(), Some(&ma));
     }
@@ -596,9 +596,10 @@ mod tests {
         .expect("valid test did");
         let mut document = Document::new(&root, &root);
 
-        document.set_ma(Ipld::Map(BTreeMap::from([
-            ("type".into(), Ipld::String("agent".into())),
-        ])));
+        document.set_ma(Ipld::Map(BTreeMap::from([(
+            "type".into(),
+            Ipld::String("agent".into()),
+        )])));
         assert!(document.ma.is_some());
         document.clear_ma();
         assert!(document.ma.is_none());
@@ -613,9 +614,10 @@ mod tests {
         .expect("valid test did");
         let mut document = Document::new(&root, &root);
 
-        document.set_ma(Ipld::Map(BTreeMap::from([
-            ("type".into(), Ipld::String("agent".into())),
-        ])));
+        document.set_ma(Ipld::Map(BTreeMap::from([(
+            "type".into(),
+            Ipld::String("agent".into()),
+        )])));
         document.set_ma(Ipld::Null);
         assert!(document.ma.is_none());
     }

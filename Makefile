@@ -4,6 +4,7 @@ build:
 	cargo build
 
 lint:
+	cargo fmt --check
 	cargo clippy --all-features -- -D warnings
 	mdl .
 
