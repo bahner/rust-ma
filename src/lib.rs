@@ -33,9 +33,9 @@
 //! let bob = generate_identity("k51qzi5uqu5dl96qbq93mwl5drvk2z83fk4s6h4n7xgqnwrxlscs11i1bja7uk").unwrap();
 //!
 //! // Reconstruct signing key from stored private key bytes
-//! let alice_sign_did = Did::new_root(&alice.root_did.ipns).unwrap();
+//! let alice_sign_url = Did::new_url(&alice.subject_url.ipns, None::<String>).unwrap();
 //! let alice_signing_key = SigningKey::from_private_key_bytes(
-//!     alice_sign_did,
+//!     alice_sign_url,
 //!     hex::decode(&alice.signing_private_key_hex).unwrap().try_into().unwrap(),
 //! ).unwrap();
 //!

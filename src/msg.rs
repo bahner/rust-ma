@@ -100,9 +100,9 @@ impl Headers {
 /// let sender = generate_identity("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr").unwrap();
 /// let recipient = generate_identity("k51qzi5uqu5dl96qbq93mwl5drvk2z83fk4s6h4n7xgqnwrxlscs11i1bja7uk").unwrap();
 ///
-/// let sign_did = Did::new_root(&sender.root_did.ipns).unwrap();
+/// let sign_url = Did::new_url(&sender.subject_url.ipns, None::<String>).unwrap();
 /// let signing_key = SigningKey::from_private_key_bytes(
-///     sign_did,
+///     sign_url,
 ///     hex::decode(&sender.signing_private_key_hex).unwrap().try_into().unwrap(),
 /// ).unwrap();
 ///
@@ -381,9 +381,9 @@ impl ReplayGuard {
 /// let alice = generate_identity("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr").unwrap();
 /// let bob = generate_identity("k51qzi5uqu5dl96qbq93mwl5drvk2z83fk4s6h4n7xgqnwrxlscs11i1bja7uk").unwrap();
 ///
-/// let alice_sign_did = Did::new_root(&alice.root_did.ipns).unwrap();
+/// let alice_sign_url = Did::new_url(&alice.subject_url.ipns, None::<String>).unwrap();
 /// let alice_key = SigningKey::from_private_key_bytes(
-///     alice_sign_did,
+///     alice_sign_url,
 ///     hex::decode(&alice.signing_private_key_hex).unwrap().try_into().unwrap(),
 /// ).unwrap();
 ///
@@ -399,9 +399,9 @@ impl ReplayGuard {
 /// let envelope = msg.enclose_for(&bob.document).unwrap();
 ///
 /// // Bob decrypts
-/// let bob_enc_did = Did::new_root(&bob.root_did.ipns).unwrap();
+/// let bob_enc_url = Did::new_url(&bob.subject_url.ipns, None::<String>).unwrap();
 /// let bob_enc_key = EncryptionKey::from_private_key_bytes(
-///     bob_enc_did,
+///     bob_enc_url,
 ///     hex::decode(&bob.encryption_private_key_hex).unwrap().try_into().unwrap(),
 /// ).unwrap();
 /// let decrypted = envelope.open(&bob.document, &bob_enc_key, &alice.document).unwrap();
@@ -623,20 +623,22 @@ mod tests {
         EncryptionKey,
         Document,
     ) {
-        let sender_did = Did::new_root("k51sender").expect("sender did");
-        let sender_sign_did = Did::new_root("k51sender").expect("sender sign did");
-        let sender_enc_did = Did::new_root("k51sender").expect("sender enc did");
-        let sender_signing = SigningKey::generate(sender_sign_did).expect("sender signing key");
+        let sender_did = Did::new_url("k51sender", None::<String>).expect("sender did");
+        let sender_sign_url = Did::new_url("k51sender", None::<String>).expect("sender sign did");
+        let sender_enc_url = Did::new_url("k51sender", None::<String>).expect("sender enc did");
+        let sender_signing = SigningKey::generate(sender_sign_url).expect("sender signing key");
         let sender_encryption =
-            EncryptionKey::generate(sender_enc_did).expect("sender encryption key");
+            EncryptionKey::generate(sender_enc_url).expect("sender encryption key");
 
-        let recipient_did = Did::new_root("k51recipient").expect("recipient did");
-        let recipient_sign_did = Did::new_root("k51recipient").expect("recipient sign did");
-        let recipient_enc_did = Did::new_root("k51recipient").expect("recipient enc did");
+        let recipient_did = Did::new_url("k51recipient", None::<String>).expect("recipient did");
+        let recipient_sign_url =
+            Did::new_url("k51recipient", None::<String>).expect("recipient sign did");
+        let recipient_enc_url =
+            Did::new_url("k51recipient", None::<String>).expect("recipient enc did");
         let recipient_signing =
-            SigningKey::generate(recipient_sign_did).expect("recipient signing key");
+            SigningKey::generate(recipient_sign_url).expect("recipient signing key");
         let recipient_encryption =
-            EncryptionKey::generate(recipient_enc_did).expect("recipient encryption key");
+            EncryptionKey::generate(recipient_enc_url).expect("recipient encryption key");
 
         let mut sender_document = Document::new(&sender_did, &sender_did);
         let sender_assertion = VerificationMethod::new(
@@ -720,9 +722,9 @@ mod tests {
 
     #[test]
     fn did_round_trip() {
-        let did = Did::new(
+        let did = Did::new_url(
             "k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr",
-            "bahner",
+            Some("bahner"),
         )
         .expect("did must build");
         let parsed = Did::try_from(did.id().as_str()).expect("did must parse");
@@ -730,10 +732,13 @@ mod tests {
     }
 
     #[test]
-    fn root_did_round_trip() {
-        let did = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr")
-            .expect("root did must build");
-        let parsed = Did::try_from(did.id().as_str()).expect("root did must parse");
+    fn subject_url_round_trip() {
+        let did = Did::new_url(
+            "k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr",
+            None::<String>,
+        )
+        .expect("subject did must build");
+        let parsed = Did::try_from(did.id().as_str()).expect("subject did must parse");
         assert_eq!(did, parsed);
     }
 

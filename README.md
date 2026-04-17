@@ -25,6 +25,14 @@ This crate implements the formal `did:ma` method specification documents at [bah
 - [Extension Fields Format](https://github.com/bahner/ma-spec/blob/main/did-ma-fields-format.md) — method-specific `ma` namespace
 - [Messaging Format](https://github.com/bahner/ma-spec/blob/main/messaging-format.md) — signed CBOR messages, encryption envelopes, replay protection
 
+## References
+
+- [W3C DID Core v1.1](https://www.w3.org/TR/did-1.1/) — Decentralized Identifiers specification
+- [Nano ID](https://github.com/ai/nanoid) — DID URL fragment generation and validation (`[A-Za-z0-9_-]+`)
+- [Multibase](https://github.com/multiformats/multibase) / [Multicodec](https://github.com/multiformats/multicodec) — key and signature encoding
+- [BLAKE3](https://github.com/BLAKE3-team/BLAKE3) — content hashing for proofs and messages
+- [IPNS](https://docs.ipfs.tech/concepts/ipns/) — DID method-specific identifier
+
 ## Project Layout
 
 - `src/constants.rs`: method name, version, BLAKE3 labels
@@ -48,22 +56,73 @@ cargo test
 
 ```toml
 [dependencies]
-ma-did = { path = "../did" }
+ma-did = "0.2"
 ```
 
 ### Identity and documents
 
-1. Generate signing and encryption keys.
-2. Build a `Document` with verification methods.
-3. Sign the document proof.
-4. Marshal/unmarshal via JSON or CBOR.
+```rust
+use ma_did::{generate_identity, Did};
+
+// Generate a complete identity (keys + signed document)
+let ipns = "k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr";
+let identity = generate_identity(ipns).unwrap();
+
+// The document is already signed and valid
+identity.document.verify().unwrap();
+identity.document.validate().unwrap();
+
+// Serialize to JSON or CBOR
+let json = identity.document.marshal().unwrap();
+let cbor = identity.document.to_cbor().unwrap();
+```
+
+### DID validation
+
+```rust
+use ma_did::Did;
+
+// Validate any DID (bare or URL)
+Did::validate("did:ma:k51qzi5uqu5abc").unwrap();
+Did::validate("did:ma:k51qzi5uqu5abc#lobby").unwrap();
+
+// Validate specifically a bare DID identity (no fragment)
+Did::validate_identity("did:ma:k51qzi5uqu5abc").unwrap();
+
+// Validate specifically a DID URL (requires fragment)
+Did::validate_url("did:ma:k51qzi5uqu5abc#lobby").unwrap();
+```
 
 ### Messages
 
-1. Create a `Message` with sender DID, recipient DID, content type, and content bytes.
-2. The message is signed automatically on creation using the sender's `SigningKey`.
-3. Verify a received message with `message.verify_with_document(&sender_document)`.
-4. Wrap in an `Envelope` for encrypted transport (X25519 + XChaCha20-Poly1305).
+```rust
+use ma_did::{generate_identity, Message, SigningKey, Did};
+
+let alice = generate_identity("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr").unwrap();
+let bob = generate_identity("k51qzi5uqu5dl96qbq93mwl5drvk2z83fk4s6h4n7xgqnwrxlscs11i1bja7uk").unwrap();
+
+// Reconstruct signing key from stored private key bytes
+let alice_sign_url = Did::new_url(&alice.subject_url.ipns, None::<String>).unwrap();
+let alice_signing_key = SigningKey::from_private_key_bytes(
+    alice_sign_url,
+    hex::decode(&alice.signing_private_key_hex).unwrap().try_into().unwrap(),
+).unwrap();
+
+// Create a signed message
+let msg = Message::new(
+    alice.document.id.clone(),
+    bob.document.id.clone(),
+    "text/plain",
+    b"hello".to_vec(),
+    &alice_signing_key,
+).unwrap();
+
+// Verify message signature against sender's document
+msg.verify_with_document(&alice.document).unwrap();
+
+// Encrypt for recipient as an Envelope
+let envelope = msg.enclose_for(&bob.document).unwrap();
+```
 
 ## License
 

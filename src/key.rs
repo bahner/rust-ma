@@ -23,7 +23,7 @@ pub const EDDSA_SIG_CODEC: u64 = 0xd0ed;
 /// ```
 /// use ma_did::{Did, SigningKey};
 ///
-/// let did = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr").unwrap();
+/// let did = Did::new_url("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr", None::<String>).unwrap();
 /// let key = SigningKey::generate(did).unwrap();
 ///
 /// let signature = key.sign(b"hello world");
@@ -31,7 +31,7 @@ pub const EDDSA_SIG_CODEC: u64 = 0xd0ed;
 ///
 /// // Export and reimport private key bytes
 /// let bytes = key.private_key_bytes();
-/// let did2 = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr").unwrap();
+/// let did2 = Did::new_url("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr", None::<String>).unwrap();
 /// let restored = SigningKey::from_private_key_bytes(did2, bytes).unwrap();
 /// assert_eq!(key.public_key_multibase, restored.public_key_multibase);
 /// ```
@@ -121,12 +121,12 @@ impl SigningKey {
 /// ```
 /// use ma_did::{Did, EncryptionKey};
 ///
-/// let did = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr").unwrap();
+/// let did = Did::new_url("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr", None::<String>).unwrap();
 /// let key = EncryptionKey::generate(did).unwrap();
 ///
 /// // Export and reimport
 /// let bytes = key.private_key_bytes();
-/// let did2 = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr").unwrap();
+/// let did2 = Did::new_url("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr", None::<String>).unwrap();
 /// let restored = EncryptionKey::from_private_key_bytes(did2, bytes).unwrap();
 /// assert_eq!(key.public_key_multibase, restored.public_key_multibase);
 /// ```

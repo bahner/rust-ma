@@ -102,7 +102,7 @@ impl VerificationMethod {
     }
 
     pub fn validate(&self) -> Result<()> {
-        Did::validate_has_fragment(&self.id)?;
+        Did::validate_url(&self.id)?;
 
         if self.key_type.is_empty() {
             return Err(MaError::VerificationMethodMissingType);
@@ -233,7 +233,7 @@ fn is_valid_rfc3339_utc(value: &str) -> bool {
 /// ```
 /// use ma_did::{Did, Document};
 ///
-/// let did = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr").unwrap();
+/// let did = Did::new_url("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr", None::<String>).unwrap();
 /// let mut doc = Document::new(&did, &did);
 /// doc.set_ma(serde_json::json!({"type": "agent", "services": {}}));
 /// assert!(doc.ma.is_some());
@@ -561,8 +561,11 @@ mod tests {
 
     #[test]
     fn set_ma_stores_opaque_value() {
-        let root = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr")
-            .expect("valid test did");
+        let root = Did::new_url(
+            "k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr",
+            None::<String>,
+        )
+        .expect("valid test did");
         let mut document = Document::new(&root, &root);
 
         let ma = serde_json::json!({"type": "agent"});
@@ -572,8 +575,11 @@ mod tests {
 
     #[test]
     fn clear_ma_removes_value() {
-        let root = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr")
-            .expect("valid test did");
+        let root = Did::new_url(
+            "k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr",
+            None::<String>,
+        )
+        .expect("valid test did");
         let mut document = Document::new(&root, &root);
 
         document.set_ma(serde_json::json!({"type": "agent"}));
@@ -584,8 +590,11 @@ mod tests {
 
     #[test]
     fn set_ma_null_clears() {
-        let root = Did::new_root("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr")
-            .expect("valid test did");
+        let root = Did::new_url(
+            "k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr",
+            None::<String>,
+        )
+        .expect("valid test did");
         let mut document = Document::new(&root, &root);
 
         document.set_ma(serde_json::json!({"type": "agent"}));

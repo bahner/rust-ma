@@ -4,26 +4,31 @@ use crate::error::{MaError, Result};
 
 pub const DID_PREFIX: &str = "did:ma:";
 
-/// A parsed `did:ma:` DID.
+/// A parsed `did:ma:` identifier.
 ///
-/// A DID consists of an IPNS identifier and an optional fragment.
-/// The base form is `did:ma:<ipns>`, and with a fragment: `did:ma:<ipns>#<fragment>`.
+/// Without a fragment this is a bare DID: `did:ma:<ipns>`.
+/// With a fragment it becomes a DID URL: `did:ma:<ipns>#<fragment>`.
+///
+/// Constructors enforce strict fragment validation (strict in what we send).
+/// Parsing via `try_from` is lenient (generous in what we receive).
 ///
 /// # Examples
 ///
 /// ```
 /// use ma_did::Did;
 ///
-/// // Parse a DID with a fragment
-/// let did = Did::try_from("did:ma:k51qzi5uqu5abc#lobby").unwrap();
-/// assert_eq!(did.ipns, "k51qzi5uqu5abc");
-/// assert_eq!(did.fragment.as_deref(), Some("lobby"));
-/// assert_eq!(did.id(), "did:ma:k51qzi5uqu5abc#lobby");
+/// // Bare DID (identity)
+/// let id = Did::new_identity("k51qzi5uqu5abc").unwrap();
+/// assert!(id.is_bare());
+/// assert_eq!(id.base_id(), "did:ma:k51qzi5uqu5abc");
 ///
-/// // Parse a bare DID (no fragment)
-/// let bare = Did::try_from("did:ma:k51qzi5uqu5abc").unwrap();
-/// assert!(bare.is_bare());
-/// assert_eq!(bare.base_id(), "did:ma:k51qzi5uqu5abc");
+/// // DID URL with auto-generated fragment
+/// let url = Did::new_url("k51qzi5uqu5abc", None::<String>).unwrap();
+/// assert!(url.is_url());
+///
+/// // Parse incoming DID URL (lenient)
+/// let parsed = Did::try_from("did:ma:k51qzi5uqu5abc#lobby").unwrap();
+/// assert_eq!(parsed.fragment.as_deref(), Some("lobby"));
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Did {
@@ -34,26 +39,30 @@ pub struct Did {
 }
 
 impl Did {
-    pub fn new(ipns: impl Into<String>, fragment: impl Into<String>) -> Result<Self> {
-        Self::new_fragment(ipns, fragment)
-    }
-
-    /// Create a DID with an auto-generated nanoid fragment.
-    /// Use `Did::new(ipns, fragment)` when you want a specific fragment.
-    pub fn new_root(ipns: impl Into<String>) -> Result<Self> {
-        Self::new_fragment(ipns, nanoid!())
-    }
-
-    pub fn new_fragment(ipns: impl Into<String>, fragment: impl Into<String>) -> Result<Self> {
+    /// Create a bare DID (`did:ma:<ipns>`) with no fragment.
+    pub fn new_identity(ipns: impl Into<String>) -> Result<Self> {
         let ipns = ipns.into();
-        let fragment = fragment.into();
-
         validate_identifier(&ipns)?;
-        validate_fragment(&fragment)?;
-
         Ok(Self {
             ipns,
-            fragment: Some(fragment),
+            fragment: None,
+        })
+    }
+
+    /// Create a DID URL (`did:ma:<ipns>#<fragment>`).
+    /// If `fragment` is `None`, a nanoid is generated automatically.
+    /// Provided fragments are validated as nanoids (`[A-Za-z0-9_-]+`).
+    pub fn new_url(ipns: impl Into<String>, fragment: Option<impl Into<String>>) -> Result<Self> {
+        let frag = match fragment {
+            Some(f) => f.into(),
+            None => nanoid!(),
+        };
+        let ipns = ipns.into();
+        validate_identifier(&ipns)?;
+        validate_fragment(&frag)?;
+        Ok(Self {
+            ipns,
+            fragment: Some(frag),
         })
     }
 
@@ -62,7 +71,7 @@ impl Did {
     }
 
     pub fn with_fragment(&self, fragment: impl Into<String>) -> Result<Self> {
-        Self::new_fragment(self.ipns.clone(), fragment)
+        Self::new_url(self.ipns.clone(), Some(fragment))
     }
 
     pub fn id(&self) -> String {
@@ -103,10 +112,6 @@ impl Did {
         Self::parse(input).map(|_| ())
     }
 
-    pub fn validate_has_fragment(input: &str) -> Result<()> {
-        Self::validate_url(input)
-    }
-
     /// Validate that `input` is a DID URL (has a fragment).
     pub fn validate_url(input: &str) -> Result<()> {
         match Self::parse(input)? {
@@ -115,8 +120,8 @@ impl Did {
         }
     }
 
-    /// Validate that `input` is a bare DID (no fragment).
-    pub fn validate_bare(input: &str) -> Result<()> {
+    /// Validate that `input` is a bare DID identity (no fragment).
+    pub fn validate_identity(input: &str) -> Result<()> {
         match Self::parse(input)? {
             (_, None) => Ok(()),
             (_, Some(_)) => Err(MaError::UnexpectedFragment),
@@ -157,6 +162,8 @@ fn validate_identifier(input: &str) -> Result<()> {
     Ok(())
 }
 
+/// Lenient fragment validation for parsing incoming data (Postel's law).
+/// Accepts any non-empty string of `[A-Za-z0-9_-]`.
 fn validate_fragment(input: &str) -> Result<()> {
     if input.is_empty()
         || !input
@@ -200,18 +207,39 @@ mod tests {
     }
 
     #[test]
-    fn validate_bare_accepts_bare() {
-        assert!(Did::validate_bare(BARE).is_ok());
+    fn validate_identity_accepts_bare() {
+        assert!(Did::validate_identity(BARE).is_ok());
     }
 
     #[test]
-    fn validate_bare_rejects_fragment() {
-        assert!(Did::validate_bare(URL).is_err());
+    fn validate_identity_rejects_fragment() {
+        assert!(Did::validate_identity(URL).is_err());
     }
 
     #[test]
-    fn validate_has_fragment_delegates_to_validate_url() {
-        assert!(Did::validate_has_fragment(URL).is_ok());
-        assert!(Did::validate_has_fragment(BARE).is_err());
+    fn new_url_none_generates_nanoid() {
+        let url = Did::new_url("k51qzi5uqu5abc", None::<String>).unwrap();
+        assert!(url.is_url());
+        assert!(!url.fragment.unwrap().is_empty());
+    }
+
+    #[test]
+    fn new_url_accepts_nanoid_fragment() {
+        let url = Did::new_url("k51qzi5uqu5abc", Some("bahner")).unwrap();
+        assert_eq!(url.fragment.as_deref(), Some("bahner"));
+    }
+
+    #[test]
+    fn new_url_rejects_invalid_chars() {
+        assert!(Did::new_url("k51qzi5uqu5abc", Some("has space")).is_err());
+        assert!(Did::new_url("k51qzi5uqu5abc", Some("has.dot")).is_err());
+        assert!(Did::new_url("k51qzi5uqu5abc", Some("")).is_err());
+    }
+
+    #[test]
+    fn try_from_lenient_accepts_non_nanoid_fragment() {
+        // Postel's law: generous in what we receive
+        let did = Did::try_from("did:ma:k51qzi5uqu5abc#lobby").unwrap();
+        assert_eq!(did.fragment.as_deref(), Some("lobby"));
     }
 }

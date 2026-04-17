@@ -6,7 +6,7 @@ use crate::{Did, Document, EncryptionKey, Result, SigningKey, VerificationMethod
 /// and [`EncryptionKey::from_private_key_bytes`] to reconstruct key objects.
 #[derive(Debug, Clone)]
 pub struct GeneratedIdentity {
-    pub root_did: Did,
+    pub subject_url: Did,
     pub document: Document,
     pub signing_private_key_hex: String,
     pub encryption_private_key_hex: String,
@@ -34,26 +34,26 @@ pub struct GeneratedIdentity {
 /// assert!(!id.encryption_private_key_hex.is_empty());
 /// ```
 pub fn generate_identity(ipns: &str) -> Result<GeneratedIdentity> {
-    let root_did = Did::new_root(ipns)?;
-    let sign_did = Did::new_root(ipns)?;
-    let enc_did = Did::new_root(ipns)?;
+    let subject_url = Did::new_url(ipns, None::<String>)?;
+    let sign_url = Did::new_url(ipns, None::<String>)?;
+    let enc_url = Did::new_url(ipns, None::<String>)?;
 
-    let signing_key = SigningKey::generate(sign_did)?;
-    let encryption_key = EncryptionKey::generate(enc_did)?;
+    let signing_key = SigningKey::generate(sign_url)?;
+    let encryption_key = EncryptionKey::generate(enc_url)?;
 
-    let mut document = Document::new(&root_did, &root_did);
+    let mut document = Document::new(&subject_url, &subject_url);
 
     let assertion_vm = VerificationMethod::new(
-        root_did.base_id(),
-        root_did.base_id(),
+        subject_url.base_id(),
+        subject_url.base_id(),
         signing_key.key_type.clone(),
         signing_key.did.fragment.as_deref().unwrap_or_default(),
         signing_key.public_key_multibase.clone(),
     )?;
 
     let key_agreement_vm = VerificationMethod::new(
-        root_did.base_id(),
-        root_did.base_id(),
+        subject_url.base_id(),
+        subject_url.base_id(),
         encryption_key.key_type.clone(),
         encryption_key.did.fragment.as_deref().unwrap_or_default(),
         encryption_key.public_key_multibase.clone(),
@@ -67,7 +67,7 @@ pub fn generate_identity(ipns: &str) -> Result<GeneratedIdentity> {
     document.sign(&signing_key, &assertion_vm)?;
 
     Ok(GeneratedIdentity {
-        root_did,
+        subject_url,
         document,
         signing_private_key_hex: hex::encode(signing_key.private_key_bytes()),
         encryption_private_key_hex: hex::encode(encryption_key.private_key_bytes()),
