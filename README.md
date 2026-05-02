@@ -106,8 +106,23 @@ cargo test
 
 ```toml
 [dependencies]
-ma-did = "0.2"
+ma-did = "0.5"
 ```
+
+## Release Notes
+
+### 0.5.0
+
+- Improved API safety with `#[must_use]` on commonly dropped return values.
+- Fixed message timestamp tests and aligned examples with current behavior.
+- Internal multiformat encoding cleanup for clearer error boundaries.
+
+### Migration Notes (0.4 -> 0.5)
+
+- If your project uses `-D warnings`, new `#[must_use]` attributes may surface ignored-result warnings.
+  Update call sites to use, store, or explicitly discard return values as needed.
+- Public crate API remains source-compatible for normal `ma_did` usage.
+  The `multiformat` module is internal (`mod multiformat`) and not exported from crate root.
 
 ### Identity and documents
 
