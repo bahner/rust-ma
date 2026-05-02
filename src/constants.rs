@@ -4,6 +4,7 @@ pub const NAME: &str = "ma";
 pub const PROPER_NAME: &str = "間";
 pub const VERSION: &str = "0.0.1";
 
+#[must_use]
 pub fn rendezvous() -> String {
     format!("/{NAME}/{VERSION}")
 }

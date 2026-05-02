@@ -57,14 +57,17 @@ impl SigningKey {
         })
     }
 
+    #[must_use]
     pub fn sign(&self, data: &[u8]) -> Vec<u8> {
         self.signing_key.sign(data).to_bytes().to_vec()
     }
 
+    #[must_use]
     pub fn verifying_key(&self) -> VerifyingKey {
         self.signing_key.verifying_key()
     }
 
+    #[must_use]
     pub fn private_key_bytes(&self) -> [u8; ed25519_dalek::SECRET_KEY_LENGTH] {
         self.signing_key.to_bytes()
     }
@@ -155,10 +158,12 @@ impl EncryptionKey {
         })
     }
 
+    #[must_use]
     pub fn shared_secret(&self, other: &X25519PublicKey) -> [u8; 32] {
         self.private_key.diffie_hellman(other).to_bytes()
     }
 
+    #[must_use]
     pub fn private_key_bytes(&self) -> [u8; 32] {
         self.private_key.to_bytes()
     }

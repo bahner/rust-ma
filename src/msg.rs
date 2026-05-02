@@ -28,6 +28,7 @@ fn default_message_ttl_secs() -> u64 {
     DEFAULT_MESSAGE_TTL_SECS
 }
 
+#[must_use]
 pub fn message_type() -> String {
     format!("{MESSAGE_PREFIX}{}", constants::VERSION)
 }
@@ -36,7 +37,7 @@ pub fn message_type() -> String {
 ///
 /// Headers include a BLAKE3 hash of the content for integrity verification.
 /// Extracted from a [`Message`] via [`Message::headers`] or [`Message::unsigned_headers`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Headers {
     pub id: String,
     #[serde(rename = "type")]
@@ -44,7 +45,7 @@ pub struct Headers {
     pub from: String,
     pub to: String,
     #[serde(rename = "createdAt")]
-    pub created_at: u64,
+    pub created_at: f64,
     #[serde(default = "default_message_ttl_secs")]
     pub ttl: u64,
     #[serde(rename = "contentType")]
@@ -138,7 +139,7 @@ impl Headers {
 /// let restored = Message::from_cbor(&bytes).unwrap();
 /// assert_eq!(msg.id, restored.id);
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Message {
     pub id: String,
     #[serde(rename = "type")]
@@ -146,7 +147,7 @@ pub struct Message {
     pub from: String,
     pub to: String,
     #[serde(rename = "createdAt")]
-    pub created_at: u64,
+    pub created_at: f64,
     #[serde(default = "default_message_ttl_secs")]
     pub ttl: u64,
     #[serde(rename = "contentType")]
@@ -213,6 +214,7 @@ impl Message {
         ciborium::de::from_reader(bytes).map_err(|error| MaError::CborDecode(error.to_string()))
     }
 
+    #[must_use]
     pub fn unsigned_headers(&self) -> Headers {
         Headers {
             id: self.id.clone(),
@@ -228,9 +230,10 @@ impl Message {
         }
     }
 
+    #[must_use]
     pub fn headers(&self) -> Headers {
         let mut headers = self.unsigned_headers();
-        headers.signature = self.signature.clone();
+        headers.signature.clone_from(&self.signature);
         headers
     }
 
@@ -347,7 +350,7 @@ impl Message {
 /// ```
 #[derive(Debug, Clone)]
 pub struct ReplayGuard {
-    seen: HashMap<String, u64>,
+    seen: HashMap<String, f64>,
     window_secs: u64,
 }
 
@@ -358,6 +361,7 @@ impl Default for ReplayGuard {
 }
 
 impl ReplayGuard {
+    #[must_use]
     pub fn new(window_secs: u64) -> Self {
         Self {
             seen: HashMap::new(),
@@ -378,7 +382,7 @@ impl ReplayGuard {
     fn prune_old(&mut self) -> Result<()> {
         let now = now_unix_secs()?;
         self.seen
-            .retain(|_, seen_at| now.saturating_sub(*seen_at) <= self.window_secs);
+            .retain(|_, seen_at| now - *seen_at <= self.window_secs as f64);
         Ok(())
     }
 }
@@ -550,24 +554,24 @@ fn validate_message_type(kind: &str) -> Result<()> {
     Err(MaError::InvalidMessageType)
 }
 
-fn now_unix_secs() -> Result<u64> {
+fn now_unix_secs() -> Result<f64> {
     #[cfg(target_arch = "wasm32")]
     {
         // Browser/WASM environments may not support SystemTime::now reliably.
-        return Ok((js_sys::Date::now() / 1000.0) as u64);
+        return Ok(js_sys::Date::now() / 1000.0);
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
+        .map(|duration| duration.as_nanos() as f64 / 1_000_000_000.0)
         .map_err(|_| MaError::InvalidMessageTimestamp)
 }
 
-fn validate_message_freshness(created_at: u64, ttl: u64) -> Result<()> {
+fn validate_message_freshness(created_at: f64, ttl: u64) -> Result<()> {
     let now = now_unix_secs()?;
 
-    if created_at > now.saturating_add(DEFAULT_MAX_CLOCK_SKEW_SECS) {
+    if created_at > now + DEFAULT_MAX_CLOCK_SKEW_SECS as f64 {
         return Err(MaError::MessageFromFuture);
     }
 
@@ -575,7 +579,7 @@ fn validate_message_freshness(created_at: u64, ttl: u64) -> Result<()> {
         return Ok(());
     }
 
-    if now.saturating_sub(created_at) > ttl {
+    if now - created_at > ttl as f64 {
         return Err(MaError::MessageTooOld);
     }
 
@@ -822,7 +826,7 @@ mod tests {
         )
         .expect("message creation");
 
-        message.created_at = 0;
+        message.created_at = 0.0;
         let result = message.verify_with_document(&sender_document);
         assert!(matches!(result, Err(MaError::MessageTooOld)));
     }
@@ -840,7 +844,7 @@ mod tests {
         .expect("message creation");
 
         message.created_at =
-            now_unix_secs().expect("current timestamp") + DEFAULT_MAX_CLOCK_SKEW_SECS + 60;
+            now_unix_secs().expect("current timestamp") + DEFAULT_MAX_CLOCK_SKEW_SECS as f64 + 60.0;
         message
             .sign(&sender_signing)
             .expect("re-sign with updated timestamp");
@@ -861,7 +865,7 @@ mod tests {
         )
         .expect("message creation");
 
-        message.created_at = 0;
+        message.created_at = 0.0;
         message.ttl = 0;
         message.sign(&sender_signing).expect("re-sign with ttl=0");
 
@@ -883,9 +887,7 @@ mod tests {
         )
         .expect("message creation with ttl");
 
-        message.created_at = now_unix_secs()
-            .expect("current timestamp")
-            .saturating_sub(5);
+        message.created_at = now_unix_secs().expect("current timestamp") - 5.0;
         message
             .sign(&sender_signing)
             .expect("re-sign with stale timestamp");

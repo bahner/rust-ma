@@ -66,6 +66,7 @@ impl Did {
         })
     }
 
+    #[must_use]
     pub fn base_id(&self) -> String {
         format!("{DID_PREFIX}{}", self.ipns)
     }
@@ -74,6 +75,7 @@ impl Did {
         Self::new_url(self.ipns.clone(), Some(fragment))
     }
 
+    #[must_use]
     pub fn id(&self) -> String {
         match &self.fragment {
             Some(fragment) => format!("{}#{fragment}", self.base_id()),
@@ -92,9 +94,8 @@ impl Did {
 
         let parts: Vec<_> = stripped.split('#').collect();
         match parts.as_slice() {
-            [] => Err(MaError::MissingIdentifier),
+            [] | [""] => Err(MaError::MissingIdentifier),
             [_, ..] if parts.len() > 2 => Err(MaError::InvalidDidFormat),
-            [""] => Err(MaError::MissingIdentifier),
             [identifier] => {
                 validate_identifier(identifier)?;
                 Ok(((*identifier).to_string(), None))
@@ -129,11 +130,13 @@ impl Did {
     }
 
     /// True when this DID has a fragment (is a DID URL).
+    #[must_use]
     pub fn is_url(&self) -> bool {
         self.fragment.is_some()
     }
 
     /// True when this DID has no fragment (bare DID).
+    #[must_use]
     pub fn is_bare(&self) -> bool {
         self.fragment.is_none()
     }
