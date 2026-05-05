@@ -1,8 +1,6 @@
 use libp2p_identity::PeerId;
 
-use crate::{
-    Did, Document, EncryptionKey, MaError, Result, SigningKey, VerificationMethod,
-};
+use crate::{Did, Document, EncryptionKey, MaError, Result, SigningKey, VerificationMethod};
 
 /// A generated DID identity with keys and a signed document.
 ///
