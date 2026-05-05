@@ -28,6 +28,8 @@ pub enum MaError {
     InvalidMessageType,
     #[error("invalid key type")]
     InvalidKeyType,
+    #[error("invalid identity secret")]
+    InvalidIdentitySecret,
     #[error("invalid recipient")]
     InvalidRecipient,
     #[error("missing message content")]

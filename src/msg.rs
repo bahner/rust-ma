@@ -111,10 +111,10 @@ impl Headers {
 /// # Examples
 ///
 /// ```
-/// use ma_did::{generate_identity, Message, SigningKey, Did};
+/// use ma_did::{generate_identity_from_secret, Message, SigningKey, Did};
 ///
-/// let sender = generate_identity("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr").unwrap();
-/// let recipient = generate_identity("k51qzi5uqu5dl96qbq93mwl5drvk2z83fk4s6h4n7xgqnwrxlscs11i1bja7uk").unwrap();
+/// let sender = generate_identity_from_secret([1u8; 32]).unwrap();
+/// let recipient = generate_identity_from_secret([2u8; 32]).unwrap();
 ///
 /// let sign_url = Did::new_url(&sender.subject_url.ipns, None::<String>).unwrap();
 /// let signing_key = SigningKey::from_private_key_bytes(
@@ -396,10 +396,10 @@ impl ReplayGuard {
 /// # Examples
 ///
 /// ```
-/// use ma_did::{generate_identity, Message, Envelope, EncryptionKey, SigningKey, Did};
+/// use ma_did::{generate_identity_from_secret, Message, Envelope, EncryptionKey, SigningKey, Did};
 ///
-/// let alice = generate_identity("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr").unwrap();
-/// let bob = generate_identity("k51qzi5uqu5dl96qbq93mwl5drvk2z83fk4s6h4n7xgqnwrxlscs11i1bja7uk").unwrap();
+/// let alice = generate_identity_from_secret([1u8; 32]).unwrap();
+/// let bob = generate_identity_from_secret([2u8; 32]).unwrap();
 ///
 /// let alice_sign_url = Did::new_url(&alice.subject_url.ipns, None::<String>).unwrap();
 /// let alice_key = SigningKey::from_private_key_bytes(

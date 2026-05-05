@@ -21,7 +21,8 @@ secure identities as a foundation for secure messaging.
   multibase (Base58btc) + multicodec encoding/decoding
   for public keys and signatures
 - **Identity generation** —
-  one-call `generate_identity()` produces keys,
+  one-call `generate_identity()` or
+  `generate_identity_from_secret()` produces keys,
   verification methods, and a signed document
 - **Document proofs** —
   `MultiformatSignature2023` proof type
@@ -127,11 +128,11 @@ ma-did = "0.5"
 ### Identity and documents
 
 ```rust
-use ma_did::{generate_identity, Did};
+use ma_did::{generate_identity_from_secret, Did};
 
-// Generate a complete identity (keys + signed document)
-let ipns = "k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr";
-let identity = generate_identity(ipns).unwrap();
+// Generate a complete identity from an application-managed secret
+let secret = [7u8; 32];
+let identity = generate_identity_from_secret(secret).unwrap();
 
 // The document is already signed and valid
 identity.document.verify().unwrap();
@@ -141,6 +142,11 @@ identity.document.validate().unwrap();
 let json = identity.document.marshal().unwrap();
 let cbor = identity.document.to_cbor().unwrap();
 ```
+
+If you already have an IPNS identifier from elsewhere, you can still call
+`generate_identity(ipns)` directly as the explicit lower-level path. If not,
+let the application supply the secret and use
+`generate_identity_from_secret(secret)` to derive it.
 
 ### DID validation
 
@@ -161,10 +167,10 @@ Did::validate_url("did:ma:k51qzi5uqu5abc#lobby").unwrap();
 ### Messages
 
 ```rust
-use ma_did::{generate_identity, Message, SigningKey, Did};
+use ma_did::{generate_identity_from_secret, Message, SigningKey, Did};
 
-let alice = generate_identity("k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr").unwrap();
-let bob = generate_identity("k51qzi5uqu5dl96qbq93mwl5drvk2z83fk4s6h4n7xgqnwrxlscs11i1bja7uk").unwrap();
+let alice = generate_identity_from_secret([1u8; 32]).unwrap();
+let bob = generate_identity_from_secret([2u8; 32]).unwrap();
 
 // Reconstruct signing key from stored private key bytes
 let alice_sign_url = Did::new_url(&alice.subject_url.ipns, None::<String>).unwrap();

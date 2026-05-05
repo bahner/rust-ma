@@ -203,11 +203,9 @@ fn is_valid_rfc3339_utc(value: &str) -> bool {
 /// # Examples
 ///
 /// ```
-/// use ma_did::{generate_identity, Document};
+/// use ma_did::{generate_identity_from_secret, Document};
 ///
-/// let id = generate_identity(
-///     "k51qzi5uqu5dj9807pbuod1pplf0vxh8m4lfy3ewl9qbm2s8dsf9ugdf9gedhr"
-/// ).unwrap();
+/// let id = generate_identity_from_secret([7u8; 32]).unwrap();
 ///
 /// // Verify the signature
 /// id.document.verify().unwrap();
